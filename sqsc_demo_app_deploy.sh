@@ -17,14 +17,6 @@
 # DOCKER_DB: default to empty which means use RDS based Postgres. Setting this to anything will speed
 # 	up the demo startup time because of the use of Postgres Docker container
 #
-# DONT_BUILD_WORKER: default to empty which means use sqsc-demo-worker GitHub repository. Setting this
-#	to anything will use the Docker Hub image
-# WORKER_BUILD_MODE: default to empty aka internal
-#
-# DONT_BUILD_APP: default to empty which means use sqsc-demo-app GitHub repository. Setting this
-#	to anything will use the Docker Hub image
-# APP_BUILD_MODE: default to empty aka travis
-#
 # DRY_RUN: default to empty. Setting this to anything will show calls to be made by sqsc instead of
 #	running them
 #
@@ -37,7 +29,6 @@ set -e
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
 PROJECT_NAME=$(echo ${1:-"sqsc-demo"} | tr '[A-Z]' '[a-z]')
-REPO_BASE=${2:-"squarescale"}
 
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
@@ -47,8 +38,17 @@ if [ -n "$DRY_RUN" ]; then
 	SQSC_BIN="echo $SQSC_BIN"
 fi
 
+if [ -z "$SQSC_TOKEN" ]; then
+	echo "You need to set SQSC_TOKEN to an existing and active API key in your account"
+	exit 1
+fi
+
 # Set default enpoint (none => production aka http://www.squarescale.io)
 if [ -n "$ENDPOINT" ]; then
+	if [ -n "$SQSC_ENDPOINT" ] && [ "$ENDPOINT" != "$SQSC_ENDPOINT" ]; then
+		echo "ENDPOINT variable ($ENDPOINT) will superseed SQSC_ENDPOINT ($SQSC_ENDPOINT)"
+		unset SQSC_ENDPOINT
+	fi
 	ENDPOINT_OPT="-endpoint $ENDPOINT"
 fi
 
@@ -58,32 +58,16 @@ $SQSC_BIN status $ENDPOINT_OPT || $SQSC_BIN login $ENDPOINT_OPT
 # Function which creates a service
 #
 # Parameters:
-# 1) GitHub repository URL
-# 2) Docker Hub container image name
-# 3) Container or repository based 1/0 (default 0 aka repository based)
-# 4) Build service: internal/travis (defaults to travis)
+# 1) Docker Hub container image name
 #
 function add_service() {
-	repo_url=$1
-	container_image=$2
-	is_container=${3:-0}
-	build_service=${4:-"travis"}
-	cur_repos=$(show_repositories)
+	container_image=$(echo "$1" | awk -F/ '{print $NF}')
 	cur_containers=$(show_containers)
-	if [ "$is_container" -eq 1 ]; then
-		if $(echo "$cur_containers" | grep -Eqw "$container_image"); then
-			echo "$PROJECT_NAME already configured with service container $container_image. Skipping..."
-		else
-			echo "Adding container service $container_image"
-			$SQSC_BIN image add $ENDPOINT_OPT -project "$PROJECT_NAME" -name "$container_image"
-		fi
+	if $(echo "$cur_containers" | grep -Eq "^\s*$container_image\s*"); then
+		echo "$PROJECT_NAME already configured with service container $container_image. Skipping..."
 	else
-		if $(echo "$cur_repos" | grep -Eqw "$repo_url"); then
-			echo "$PROJECT_NAME already configured with service repository $repo_url. Skipping..."
-		else
-			echo "Adding service repository $repo_url"
-			$SQSC_BIN repository add $ENDPOINT_OPT -project "$PROJECT_NAME" -build-service "$build_service" -url "$repo_url"
-		fi
+		echo "Adding container service $container_image"
+		$SQSC_BIN image add $ENDPOINT_OPT -project "$PROJECT_NAME" -name "$1"
 	fi
 }
 
@@ -123,7 +107,7 @@ function add_docker_database(){
 	set_env_var PROJECT_DB_NAME "dbmain"
 	# All variables are defined before container launch to avoid
 	# un-necessary re-scheduling due to environment changes
-	add_service "" postgres 1
+	add_service postgres
 }
 
 # Function creating the project
@@ -172,32 +156,20 @@ function display_env_vars(){
 	$SQSC_BIN_CHECK env get $ENDPOINT_OPT -project "$PROJECT_NAME"
 }
 
-function show_repositories(){
-	$SQSC_BIN_CHECK repository list $ENDPOINT_OPT -project "$PROJECT_NAME"
-}
-
 function show_containers(){
 	$SQSC_BIN_CHECK container list $ENDPOINT_OPT -project "$PROJECT_NAME"
 }
 
 function add_services(){
-	add_service \
-		https://github.com/${REPO_BASE}/sqsc-demo-worker \
-		squarescale/sqsc-demo-worker \
-		"$([ -z "$DONT_BUILD_WORKER" ] ; echo $?)" \
-		"${WORKER_BUILD_MODE:-"internal"}"
-	add_service \
-		https://github.com/${REPO_BASE}/sqsc-demo-app \
-		squarescale/sqsc-demo-app \
-		"$([ -z "$DONT_BUILD_APP" ] ; echo $?)" \
-		"${APP_BUILD_MODE:-"travis"}"
-	add_service "" rabbitmq 1
+	add_service squarescale/sqsc-demo-worker
+	add_service squarescale/sqsc-demo-app
+	add_service rabbitmq
 }
 
 function set_lb(){
 	lb_url=$($SQSC_BIN_CHECK lb list $ENDPOINT_OPT -project "$PROJECT_NAME")
-	if $(echo "$lb_url" | grep -Eq "\[ \] ${REPO_BASE}/sqsc-demo-app:") || $(echo "$lb_url" | grep -Eq "state: disabled"); then
-		$SQSC_BIN lb set $ENDPOINT_OPT -project "$PROJECT_NAME" -container ${REPO_BASE}/sqsc-demo-app -port 3000
+	if $(echo "$lb_url" | grep -Eq "\[ \] sqsc-demo-app:") || $(echo "$lb_url" | grep -Eq "state: disabled"); then
+		$SQSC_BIN lb set $ENDPOINT_OPT -project "$PROJECT_NAME" -container sqsc-demo-app -port 3000
 	else
 		echo "Load balancer already configured. Skipping..."
 	fi
@@ -213,6 +185,5 @@ set_lb
 
 # Show all
 display_env_vars
-show_repositories
 show_containers
 show_url
