@@ -114,7 +114,7 @@ function add_docker_database(){
 # this is the main entry point
 function create_project(){
 	projects=$($SQSC_BIN_CHECK project list $ENDPOINT_OPT)
-	if $(echo "$projects" | grep -qw "$PROJECT_NAME"); then
+	if $(echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"); then
 		echo "$PROJECT_NAME already created. Skipping..."
 	else
 		if [ -z "$DOCKER_DB" ]; then
