@@ -12,7 +12,10 @@
 #
 # It can also be customized via a set of environment variables
 #
-# ENDPOINT: target SquareScale platform endpoint (defaults to empty aka https://www.squarescale.io)
+# SQSC_ENDPOINT: target SquareScale platform endpoint (defaults to empty aka https://www.squarescale.io)
+#
+# SQSC_TOKEN: security token generated via API Keys menu on platform endpoint
+# and used to run `sqsc login` successfully
 #
 # DOCKER_DB: default to empty which means use RDS based Postgres. Setting this to anything will speed
 # 	up the demo startup time because of the use of Postgres Docker container
@@ -20,8 +23,15 @@
 # DRY_RUN: default to empty. Setting this to anything will show calls to be made by sqsc instead of
 #	running them
 #
+# Default Docker hub images for all services can be customized/changed by
+# using the appropriate variable
+#
+# POSTGRES_DOCKER_IMAGE: default to postgres
+# RABBITMQ_DOCKER_IMAGE: default to rabbitmq
+# WORKER_DOCKER_IMAGE:   default to squarescale/sqsc-demo-worker
+# APP_DOCKER_IMAGE:      default to squarescale/sqsc-demo-app
 
-SCRIPT_VERSION="1.0-2018-08-16"
+SCRIPT_VERSION="1.1-2020-03-04"
 
 # Exit on errors
 set -e
@@ -107,7 +117,7 @@ function add_docker_database(){
 	set_env_var PROJECT_DB_NAME "dbmain"
 	# All variables are defined before container launch to avoid
 	# un-necessary re-scheduling due to environment changes
-	add_service postgres
+	add_service ${POSTGRES_DOCKER_IMAGE:-postgres}
 }
 
 # Function creating the project
@@ -161,9 +171,9 @@ function show_containers(){
 }
 
 function add_services(){
-	add_service squarescale/sqsc-demo-worker
-	add_service squarescale/sqsc-demo-app
-	add_service rabbitmq
+	add_service ${WORKER_DOCKER_IMAGE:-squarescale/sqsc-demo-worker}
+	add_service ${APP_DOCKER_IMAGE:-squarescale/sqsc-demo-app}
+	add_service ${RABBITMQ_DOCKER_IMAGE:-rabbitmq}
 }
 
 function set_lb(){
