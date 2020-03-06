@@ -33,23 +33,29 @@
 #
 # VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka small
 #
+# RABBITMQ_RAM_SIZE: memory used by RabbitMQ container. Default is 4096
 
-SCRIPT_VERSION="1.2-2020-03-05"
+SCRIPT_VERSION="1.3-2020-03-06"
 
 echo -e "\nRunning $(basename "${BASH_SOURCE[0]}") version ${SCRIPT_VERSION}\n"
 
 # Exit on errors
 set -e
 
-# Set project name according to 1st argument on command line or default
-# Convert to lower-case to avoid later errors
-# Remove non printable chars
-PROJECT_NAME=$(echo "${1:-"sqsc-demo"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[:print:]')
-
 # Set infra instances size (small, medium, large, dev, xsmall).
 # Default is medium because of RabbitMQ requirements
 #
 INFRA_NODE_SIZE=${VM_SIZE:-"medium"}
+
+# Set memory used by RabbitMQ container
+# Default is 4096 because of RabbitMQ requirements
+#
+RABBITMQ_RAM_SIZE=${RABBITMQ_RAM_SIZE:-"4096"}
+
+# Set project name according to 1st argument on command line or default
+# Convert to lower-case to avoid later errors
+# Remove non printable chars
+PROJECT_NAME=$(echo "${1:-"sqsc-demo"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[:print:]')
 
 if [ -z "${PROJECT_NAME}" ]; then
 	echo "${1:-"sqsc-demo"} is not a valid project name (non-printable characters)"
@@ -91,6 +97,10 @@ function add_service() {
 	else
 		echo "Adding container service $container_image"
 		${SQSC_BIN} image add -project "${PROJECT_NAME}" -name "$1"
+	fi
+	if [ -n "$2" ]; then
+		echo "Increasing $1 container memory to $2"
+		${SQSC_BIN} container set -project "${PROJECT_NAME}" -container "$1" -memory "$2"
 	fi
 }
 
@@ -188,7 +198,7 @@ function show_containers(){
 function add_services(){
 	add_service "${WORKER_DOCKER_IMAGE:-squarescale/sqsc-demo-worker}"
 	add_service "${APP_DOCKER_IMAGE:-squarescale/sqsc-demo-app}"
-	add_service "${RABBITMQ_DOCKER_IMAGE:-rabbitmq}"
+	add_service "${RABBITMQ_DOCKER_IMAGE:-rabbitmq}" "${RABBITMQ_RAM_SIZE}"
 }
 
 function set_lb(){
