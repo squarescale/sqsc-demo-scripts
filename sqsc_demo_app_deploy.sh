@@ -30,6 +30,9 @@
 # RABBITMQ_DOCKER_IMAGE: default to rabbitmq
 # WORKER_DOCKER_IMAGE:   default to squarescale/sqsc-demo-worker
 # APP_DOCKER_IMAGE:      default to squarescale/sqsc-demo-app
+#
+# VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka small
+#
 
 SCRIPT_VERSION="1.2-2020-03-05"
 
@@ -42,6 +45,11 @@ set -e
 # Convert to lower-case to avoid later errors
 # Remove non printable chars
 PROJECT_NAME=$(echo "${1:-"sqsc-demo"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[:print:]')
+
+# Set infra instances size (small, medium, large, dev, xsmall).
+# Default is medium because of RabbitMQ requirements
+#
+INFRA_NODE_SIZE=${VM_SIZE:-"medium"}
 
 if [ -z "${PROJECT_NAME}" ]; then
 	echo "${1:-"sqsc-demo"} is not a valid project name (non-printable characters)"
@@ -134,9 +142,9 @@ function create_project(){
 		echo "${PROJECT_NAME} already created. Skipping..."
 	else
 		if [ -z "${DOCKER_DB}" ]; then
-			${SQSC_BIN} project create -db-engine postgres -db-size small -node-size small -name "${PROJECT_NAME}"
+			${SQSC_BIN} project create -db-engine postgres -db-size small -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
 		else
-			${SQSC_BIN} project create -no-db -node-size small -name "${PROJECT_NAME}"
+			${SQSC_BIN} project create -no-db -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
 		fi
 	fi
 	# All variables are defined before container launch to avoid
