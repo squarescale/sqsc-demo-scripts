@@ -34,8 +34,21 @@
 # VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka small
 #
 # RABBITMQ_RAM_SIZE: memory used by RabbitMQ container. Default is 4096
+#
+# Since version 1.4, multi-cloud providers support has been added and therefore the following
+# environment variables have been added
+#
+# CLOUD_PROVIDER: default to aws (can be switched to azure)
+# CLOUD_REGION: default to eu-west-1
+# CLOUD_CREDENTIALS: default to ""
+#
+# Support for multiple databases version has also been added
+# DEFAULT_PG_VERSION: default to 10
 
-SCRIPT_VERSION="1.3-2020-03-06"
+SCRIPT_VERSION="1.4-2020-08-05"
+
+# Do not ask interactive user confirmation when creating resources
+NO_CONFIRM=${NO_CONFIRM:-"-yes"}
 
 echo -e "\nRunning $(basename "${BASH_SOURCE[0]}") version ${SCRIPT_VERSION}\n"
 
@@ -52,6 +65,9 @@ INFRA_NODE_SIZE=${VM_SIZE:-"medium"}
 #
 RABBITMQ_RAM_SIZE=${RABBITMQ_RAM_SIZE:-"4096"}
 
+# Default Postgres RDS version
+DEFAULT_PG_VERSION=${DEFAULT_PG_VERSION:-"10"}
+
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
 # Remove non printable chars
@@ -59,6 +75,16 @@ PROJECT_NAME=$(echo "${1:-"sqsc-demo"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[
 
 if [ -z "${PROJECT_NAME}" ]; then
 	echo "${1:-"sqsc-demo"} is not a valid project name (non-printable characters)"
+	exit 1
+fi
+
+# Cloud related environment variables
+CLOUD_PROVIDER=${CLOUD_PROVIDER:-"aws"}
+CLOUD_REGION=${CLOUD_REGION:-"eu-west-1"}
+CLOUD_CREDENTIALS=${CLOUD_CREDENTIALS:-""}
+
+if [[ -z "${CLOUD_PROVIDER}" || ( "${CLOUD_PROVIDER}" != "aws" && "${CLOUD_PROVIDER}" != "azure" ) ]]; then
+	echo "CLOUD_PROVIDER=${CLOUD_PROVIDER} unsupported (only aws/azure)"
 	exit 1
 fi
 
@@ -96,11 +122,11 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image"
-		${SQSC_BIN} image add -project "${PROJECT_NAME}" -name "$1"
+		${SQSC_BIN} image add -project-uuid "${PROJECT_UUID}" -name "$1"
 	fi
 	if [ -n "$2" ]; then
 		echo "Increasing $1 container memory to $2"
-		${SQSC_BIN} container set -project "${PROJECT_NAME}" -container "$1" -memory "$2"
+		${SQSC_BIN} container set -project-uuid "${PROJECT_UUID}" -service "$1" -memory "$2"
 	fi
 }
 
@@ -110,13 +136,13 @@ function set_env_var(){
 	# sqsc env get returns error if variable is not set already
 	# and -e has been activated globally at the top of this script
 	set +e
-	v=$(${SQSC_BIN_CHECK} env get -project "${PROJECT_NAME}" "$1" 2>/dev/null)
+	v=$(${SQSC_BIN_CHECK} env get -project-uuid "${PROJECT_UUID}" "$1" 2>/dev/null)
 	# Error: aka variable not defined
 	# shellcheck disable=SC2181
 	if [ $? -eq 0 ] && [ "$v" == "$2" ]; then
 		echo "$1 already set to $2. Skipping..."
 	else
-		${SQSC_BIN} env set -project "${PROJECT_NAME}" "$1" "$2"
+		${SQSC_BIN} env set -project-uuid "${PROJECT_UUID}" "$1" "$2"
 	fi
 	# Restore script failure on further errors
 	set -e
@@ -152,11 +178,14 @@ function create_project(){
 		echo "${PROJECT_NAME} already created. Skipping..."
 	else
 		if [ -z "${DOCKER_DB}" ]; then
-			${SQSC_BIN} project create -db-engine postgres -db-size small -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
+			${SQSC_BIN} project create "${NO_CONFIRM}" -provider "${CLOUD_PROVIDER}" -region "${CLOUD_REGION}" -credential "${CLOUD_CREDENTIALS}" -db-engine postgres -db-size small -db-version "${DEFAULT_PG_VERSION}" -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
 		else
-			${SQSC_BIN} project create -no-db -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
+			${SQSC_BIN} project create "${NO_CONFIRM}" -provider "${CLOUD_PROVIDER}" -region "${CLOUD_REGION}" -credential "${CLOUD_CREDENTIALS}" -no-db -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
 		fi
+		projects=$(${SQSC_BIN_CHECK} project list)
 	fi
+	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')
+
 	# All variables are defined before container launch to avoid
 	# un-necessary re-scheduling due to environment changes
 	set_env_vars
@@ -164,7 +193,7 @@ function create_project(){
 		# sqsc env get returns error if variable is not set already
 		# and -e has been activated globally at the top of this script
 		set +e
-		dbpasswd=$(${SQSC_BIN_CHECK} env get -project "${PROJECT_NAME}" POSTGRES_PASSWORD 2>/dev/null)
+		dbpasswd=$(${SQSC_BIN_CHECK} env get -project-uuid "${PROJECT_UUID}" POSTGRES_PASSWORD 2>/dev/null)
 		# shellcheck disable=SC2181
 		if [ $? -ne 0 ] && [ -z "$dbpasswd" ]; then
 			dbpasswd=$(pwgen 32 1)
@@ -174,10 +203,14 @@ function create_project(){
 		add_docker_database
 	fi
 	# To send notifications on #demoapp SquareScale Slack channel
-	if [ -n "$(${SQSC_BIN_CHECK} project slackbot "${PROJECT_NAME}")" ]; then
+	if [ -z "$(${SQSC_BIN_CHECK} project slackbot -project-uuid "${PROJECT_UUID}")" ]; then
 		echo "${PROJECT_NAME} already configured with Slack. Skipping..."
 	else
-		${SQSC_BIN} project slackbot "${PROJECT_NAME}" https://hooks.slack.com/services/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
+		if [ -n "${SLACK_WEB_HOOK}" ]; then
+			${SQSC_BIN} project slackbot -project-uuid "${PROJECT_UUID}" "${SLACK_WEB_HOOK}"
+		else
+			echo "SLACK_WEB_HOOK not set: ignoring ..."
+		fi
 	fi
 }
 
@@ -188,11 +221,11 @@ function set_env_vars(){
 }
 
 function display_env_vars(){
-	${SQSC_BIN_CHECK} env get -project "${PROJECT_NAME}"
+	${SQSC_BIN_CHECK} env get -project-uuid "${PROJECT_UUID}"
 }
 
 function show_containers(){
-	${SQSC_BIN_CHECK} container list -project "${PROJECT_NAME}"
+	${SQSC_BIN_CHECK} container list -project-uuid "${PROJECT_UUID}"
 }
 
 function add_services(){
@@ -202,16 +235,16 @@ function add_services(){
 }
 
 function set_lb(){
-	lb_url=$(${SQSC_BIN_CHECK} lb list -project "${PROJECT_NAME}")
+	lb_url=$(${SQSC_BIN_CHECK} lb list -project-uuid "${PROJECT_UUID}")
 	if echo "$lb_url" | grep -Eq "\[ \] sqsc-demo-app:" || echo "$lb_url" | grep -Eq "state: disabled"; then
-		${SQSC_BIN} lb set -project "${PROJECT_NAME}" -container sqsc-demo-app -port 3000
+		${SQSC_BIN} lb set -project-uuid "${PROJECT_UUID}" -container sqsc-demo-app -port 3000
 	else
 		echo "Load balancer already configured. Skipping..."
 	fi
 }
 
 function show_url(){
-	${SQSC_BIN} lb url -project "${PROJECT_NAME}"
+	${SQSC_BIN} lb url -project-uuid "${PROJECT_UUID}"
 }
 
 create_project
