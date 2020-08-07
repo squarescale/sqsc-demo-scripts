@@ -90,7 +90,6 @@ fi
 
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
-SQSC_BIN_CHECK=${SQSC_BIN}
 # Show calls to sqsc instead of executing them
 if [ -n "${DRY_RUN}" ]; then
 	SQSC_BIN="echo ${SQSC_BIN}"
@@ -136,7 +135,7 @@ function set_env_var(){
 	# sqsc env get returns error if variable is not set already
 	# and -e has been activated globally at the top of this script
 	set +e
-	v=$(${SQSC_BIN_CHECK} env get -project-uuid "${PROJECT_UUID}" "$1" 2>/dev/null)
+	v=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" "$1" 2>/dev/null)
 	# Error: aka variable not defined
 	# shellcheck disable=SC2181
 	if [ $? -eq 0 ] && [ "$v" == "$2" ]; then
@@ -173,7 +172,7 @@ function add_docker_database(){
 # Function creating the project
 # this is the main entry point
 function create_project(){
-	projects=$(${SQSC_BIN_CHECK} project list)
+	projects=$(${SQSC_BIN} project list)
 	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
 	else
@@ -182,7 +181,7 @@ function create_project(){
 		else
 			${SQSC_BIN} project create "${NO_CONFIRM}" -provider "${CLOUD_PROVIDER}" -region "${CLOUD_REGION}" -credential "${CLOUD_CREDENTIALS}" -no-db -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
 		fi
-		projects=$(${SQSC_BIN_CHECK} project list)
+		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')
 
@@ -193,7 +192,7 @@ function create_project(){
 		# sqsc env get returns error if variable is not set already
 		# and -e has been activated globally at the top of this script
 		set +e
-		dbpasswd=$(${SQSC_BIN_CHECK} env get -project-uuid "${PROJECT_UUID}" POSTGRES_PASSWORD 2>/dev/null)
+		dbpasswd=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" POSTGRES_PASSWORD 2>/dev/null)
 		# shellcheck disable=SC2181
 		if [ $? -ne 0 ] && [ -z "$dbpasswd" ]; then
 			dbpasswd=$(pwgen 32 1)
@@ -203,7 +202,7 @@ function create_project(){
 		add_docker_database
 	fi
 	# To send notifications on #demoapp SquareScale Slack channel
-	if [ -z "$(${SQSC_BIN_CHECK} project slackbot -project-uuid "${PROJECT_UUID}")" ]; then
+	if [ -z "$(${SQSC_BIN} project slackbot -project-uuid "${PROJECT_UUID}")" ]; then
 		echo "${PROJECT_NAME} already configured with Slack. Skipping..."
 	else
 		if [ -n "${SLACK_WEB_HOOK}" ]; then
@@ -221,11 +220,11 @@ function set_env_vars(){
 }
 
 function display_env_vars(){
-	${SQSC_BIN_CHECK} env get -project-uuid "${PROJECT_UUID}"
+	${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}"
 }
 
 function show_containers(){
-	${SQSC_BIN_CHECK} container list -project-uuid "${PROJECT_UUID}"
+	${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
 }
 
 function add_services(){
@@ -235,7 +234,7 @@ function add_services(){
 }
 
 function set_lb(){
-	lb_url=$(${SQSC_BIN_CHECK} lb list -project-uuid "${PROJECT_UUID}")
+	lb_url=$(${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}")
 	if echo "$lb_url" | grep -Eq "\[ \] sqsc-demo-app:" || echo "$lb_url" | grep -Eq "state: disabled"; then
 		${SQSC_BIN} lb set -project-uuid "${PROJECT_UUID}" -container sqsc-demo-app -port 3000
 	else
