@@ -270,12 +270,12 @@ function add_services(){
 	add_service "${RABBITMQ_DOCKER_IMAGE:-rabbitmq}" "${RABBITMQ_RAM_SIZE}"
 }
 
-function set_lb(){
-	lb_url=$(${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}")
-	if echo "$lb_url" | grep -Eq "\[ \] sqsc-demo-app:" || echo "$lb_url" | grep -Eq "state: disabled"; then
-		${SQSC_BIN} lb set -project-uuid "${PROJECT_UUID}" -container sqsc-demo-app -port 3000
+function set_network_rule(){
+	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name sqsc-demo-app)
+	if echo "$net_rule" | grep -Eq '^sqsc-demo-app\s*http/3000\s*http/80\s*'; then
+		echo "Network rule already configured. Skipping..."
 	else
-		echo "Load balancer already configured. Skipping..."
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "sqsc-demo-app" -internal-protocol "http" -internal-port 3000 -external-protocol "http" -service-name "sqsc-demo-app"
 	fi
 }
 
@@ -285,7 +285,7 @@ function show_url(){
 
 create_project
 add_services
-set_lb
+set_network_rule
 
 # Show all
 display_env_vars
