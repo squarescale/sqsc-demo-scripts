@@ -35,8 +35,8 @@
 #
 # RABBITMQ_RAM_SIZE: memory used by RabbitMQ container. Default is 4096
 #
-# Since version 1.4, multi-cloud providers support has been added and therefore the following
-# environment variables have been added
+# Since version 1.4 of this script, multi-cloud providers support has been added
+# and therefore the following environment variables have been added
 #
 # CLOUD_PROVIDER: default to aws (can be switched to azure)
 # CLOUD_REGION: default to eu-west-1
@@ -44,8 +44,11 @@
 #
 # Support for multiple databases version has also been added
 # DEFAULT_PG_VERSION: default to 10
-
-SCRIPT_VERSION="1.4-2020-08-05"
+#
+# Monitoring via netdata can be activated on project deployment
+# MONITORING=netdata # default to ""
+#
+SCRIPT_VERSION="1.4-2020-08-07"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -78,16 +81,6 @@ if [ -z "${PROJECT_NAME}" ]; then
 	exit 1
 fi
 
-# Cloud related environment variables
-CLOUD_PROVIDER=${CLOUD_PROVIDER:-"aws"}
-CLOUD_REGION=${CLOUD_REGION:-"eu-west-1"}
-CLOUD_CREDENTIALS=${CLOUD_CREDENTIALS:-""}
-
-if [[ -z "${CLOUD_PROVIDER}" || ( "${CLOUD_PROVIDER}" != "aws" && "${CLOUD_PROVIDER}" != "azure" ) ]]; then
-	echo "CLOUD_PROVIDER=${CLOUD_PROVIDER} unsupported (only aws/azure)"
-	exit 1
-fi
-
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
@@ -115,6 +108,26 @@ fi
 
 # Check current SquareScale endpoint status
 ${SQSC_BIN} status || ${SQSC_BIN} login
+
+# Cloud related environment variables
+CLOUD_PROVIDER=${CLOUD_PROVIDER:-"aws"}
+CLOUD_REGION=${CLOUD_REGION:-"eu-west-1"}
+CLOUD_CREDENTIALS=${CLOUD_CREDENTIALS:-""}
+
+if [[ -z "${CLOUD_PROVIDER}" || ( "${CLOUD_PROVIDER}" != "aws" && "${CLOUD_PROVIDER}" != "azure" ) ]]; then
+	echo "CLOUD_PROVIDER=${CLOUD_PROVIDER} unsupported (only aws/azure)"
+	exit 1
+fi
+
+# Add monitoring to deployment
+MONITORING=${MONITORING:-""}
+if [ -n "${MONITORING}" ]; then
+	if [ "${MONITORING}" != "netdata" ]; then
+		echo "MONITORING=${MONITORING} unsupported (only netdata)"
+		exit 1
+	fi
+	MONITORING_OPTIONS="-monitoring ${MONITORING}"
+fi
 
 # Function which creates a service
 #
@@ -184,9 +197,9 @@ function create_project(){
 		echo "${PROJECT_NAME} already created. Skipping..."
 	else
 		if [ -z "${DOCKER_DB}" ]; then
-			${SQSC_BIN} project create "${NO_CONFIRM}" -provider "${CLOUD_PROVIDER}" -region "${CLOUD_REGION}" -credential "${CLOUD_CREDENTIALS}" -db-engine postgres -db-size small -db-version "${DEFAULT_PG_VERSION}" -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
+			eval "${SQSC_BIN} project create ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		else
-			${SQSC_BIN} project create "${NO_CONFIRM}" -provider "${CLOUD_PROVIDER}" -region "${CLOUD_REGION}" -credential "${CLOUD_CREDENTIALS}" -no-db -node-size "${INFRA_NODE_SIZE}" -name "${PROJECT_NAME}"
+			eval "${SQSC_BIN} project create ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		fi
 		projects=$(${SQSC_BIN} project list)
 	fi
