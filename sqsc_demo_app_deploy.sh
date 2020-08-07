@@ -129,12 +129,29 @@ if [ -n "${MONITORING}" ]; then
 	MONITORING_OPTIONS="-monitoring ${MONITORING}"
 fi
 
+# Function which wait for project cluster to
+# be able to schedule containers
+#
+function wait_for_project_scheduling() {
+	while true; do
+		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $NF}' | sed -e 's?/? ?'))
+		if [ "${available[0]}" != "${available[1]}" ] && [ "${available[0]}" == "0" ]; then
+			echo "Project ${PROJECT_NAME} is not ready to scheduled any containers yet"
+			sleep 5
+		else
+			break
+		fi
+	done
+}
+
 # Function which creates a service
 #
 # Parameters:
 # 1) Docker Hub container image name
+# 2) Memory size required (optional)
 #
 function add_service() {
+	wait_for_project_scheduling
 	container_image=$(echo "$1" | awk -F/ '{print $NF}')
 	cur_containers=$(show_containers)
 	if echo "$cur_containers" | grep -Eq "^${container_image}\s\s*"; then
@@ -263,7 +280,7 @@ function set_lb(){
 }
 
 function show_url(){
-	${SQSC_BIN} lb url -project-uuid "${PROJECT_UUID}"
+	${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}" | tail -1
 }
 
 create_project
