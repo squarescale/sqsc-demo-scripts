@@ -134,6 +134,7 @@ fi
 #
 function wait_for_project_scheduling() {
 	while true; do
+		# shellcheck disable=SC2207
 		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $NF}' | sed -e 's?/? ?'))
 		if [ "${available[0]}" != "${available[1]}" ] && [ "${available[0]}" == "0" ]; then
 			echo "Project ${PROJECT_NAME} is not ready to scheduled any containers yet"
@@ -239,14 +240,20 @@ function create_project(){
 		add_docker_database
 	fi
 	# To send notifications on #demoapp SquareScale Slack channel
-	if [ -z "$(${SQSC_BIN} project slackbot -project-uuid "${PROJECT_UUID}")" ]; then
-		echo "${PROJECT_NAME} already configured with Slack. Skipping..."
-	else
-		if [ -n "${SLACK_WEB_HOOK}" ]; then
-			${SQSC_BIN} project slackbot -project-uuid "${PROJECT_UUID}" "${SLACK_WEB_HOOK}"
-		else
-			echo "SLACK_WEB_HOOK not set: ignoring ..."
+	if [ -n "${SLACK_WEB_HOOK}" ]; then
+		slackwebhook="$(${SQSC_BIN} project slackbot -project-uuid "${PROJECT_UUID}")"
+		tobeupdated=true
+		if [ -n "$slackwebhook" ]; then
+			if [ "$slackwebhook" == "${SLACK_WEB_HOOK}" ]; then
+				echo "${PROJECT_NAME} already configured with Slack. Skipping..."
+				tobeupdated=false
+			fi
 		fi
+		if $tobeupdated; then
+			${SQSC_BIN} project slackbot -project-uuid "${PROJECT_UUID}" "${SLACK_WEB_HOOK}"
+		fi
+	else
+		echo "SLACK_WEB_HOOK not set: ignoring ..."
 	fi
 }
 
