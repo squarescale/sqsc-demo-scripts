@@ -135,7 +135,7 @@ fi
 function wait_for_project_scheduling() {
 	while true; do
 		# shellcheck disable=SC2207
-		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $NF}' | sed -e 's?/? ?'))
+		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $(NF-1)}' | sed -e 's?/? ?'))
 		if [ "${available[0]}" != "${available[1]}" ] && [ "${available[0]}" == "0" ]; then
 			echo "Project ${PROJECT_NAME} is not ready to scheduled any containers yet"
 			sleep 5
@@ -214,10 +214,13 @@ function create_project(){
 	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
 	else
+		if [ -n "${SLACK_WEB_HOOK}" ]; then
+			SLACK_OPTIONS="-slackbot ${SLACK_WEB_HOOK}"
+		fi
 		if [ -z "${DOCKER_DB}" ]; then
-			eval "${SQSC_BIN} project create ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		else
-			eval "${SQSC_BIN} project create ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		fi
 		projects=$(${SQSC_BIN} project list)
 	fi
