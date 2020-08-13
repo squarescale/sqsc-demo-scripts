@@ -135,7 +135,7 @@ fi
 function wait_for_project_scheduling() {
 	while true; do
 		# shellcheck disable=SC2207
-		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $(NF-1)}' | sed -e 's?/? ?'))
+		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '$NF ~ /[0-9][0-9]*\/[0-9][0-9]*/ {print $NF;exit}{print $(NF-1)}' | sed -e 's?/? ?'))
 		if [ "${available[0]}" != "${available[1]}" ] && [ "${available[0]}" == "0" ]; then
 			echo "Project ${PROJECT_NAME} is not ready to scheduled any containers yet"
 			sleep 5
