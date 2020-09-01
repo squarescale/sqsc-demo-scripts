@@ -84,7 +84,7 @@ fi
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.0.1"
+REQUIRED_SQSC_VERSION="1.0.2"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
@@ -133,10 +133,11 @@ fi
 # be able to schedule containers
 #
 function wait_for_project_scheduling() {
+	echo "Waiting for project to be able to schedule containers"
 	while true; do
 		# shellcheck disable=SC2207
 		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '$NF ~ /[0-9][0-9]*\/[0-9][0-9]*/ {print $NF;exit}{print $(NF-1)}' | sed -e 's?/? ?'))
-		if [ "${available[0]}" != "${available[1]}" ] && [ "${available[0]}" == "0" ]; then
+		if [ "${available[0]}" != "${available[1]}" ] || [ "${available[0]}" == "0" ]; then
 			echo "Project ${PROJECT_NAME} is not ready to scheduled any containers yet"
 			sleep 5
 		else
@@ -285,6 +286,8 @@ function set_network_rule(){
 	if echo "$net_rule" | grep -Eq '^sqsc-demo-app\s*http/3000\s*http/80\s*'; then
 		echo "Network rule already configured. Skipping..."
 	else
+		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
+		echo "Adding network rule"
 		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "sqsc-demo-app" -internal-protocol "http" -internal-port 3000 -external-protocol "http" -service-name "sqsc-demo-app"
 	fi
 }
