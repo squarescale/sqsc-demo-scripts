@@ -48,7 +48,7 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.4-2020-08-07"
+SCRIPT_VERSION="1.5-2020-12-12"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -84,7 +84,7 @@ fi
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.0.2"
+REQUIRED_SQSC_VERSION="1.0.3"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
@@ -96,7 +96,7 @@ if [ -n "${DRY_RUN}" ]; then
 fi
 
 if [ -z "${SQSC_TOKEN}" ]; then
-	echo "You need to set SQSC_TOKEN to an existing and active API key in your account"
+	echo "You need to set SQSC_TOKEN to an existing and active API key in your account profile"
 	exit 1
 fi
 
@@ -217,6 +217,10 @@ function create_project(){
 	else
 		if [ -n "${SLACK_WEB_HOOK}" ]; then
 			SLACK_OPTIONS="-slackbot ${SLACK_WEB_HOOK}"
+		fi
+		if [ -z "${CLOUD_CREDENTIALS}" ]; then
+			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
+			exit 1
 		fi
 		if [ -z "${DOCKER_DB}" ]; then
 			eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
