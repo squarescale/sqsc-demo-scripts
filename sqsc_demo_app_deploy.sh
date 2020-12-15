@@ -138,7 +138,7 @@ function wait_for_project_scheduling() {
 		# shellcheck disable=SC2207
 		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '$NF ~ /[0-9][0-9]*\/[0-9][0-9]*/ {print $NF;exit}{print $(NF-1)}' | sed -e 's?/? ?'))
 		if [ "${available[0]}" != "${available[1]}" ] || [ "${available[0]}" == "0" ]; then
-			echo "Project ${PROJECT_NAME} is not ready to scheduled any containers yet"
+			echo "Project ${PROJECT_NAME} is not ready to schedule any containers yet"
 			sleep 5
 		else
 			break
@@ -276,7 +276,28 @@ function display_env_vars(){
 }
 
 function show_containers(){
-	${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
+       ${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
+}
+
+function wait_containers(){
+    while true; do
+        c=$(show_containers | while read -r -a container; do
+			if [ "${container[0]}" != "Name" ]; then
+                r=$(echo "${container[1]}" | awk -F/ '$1==$2{print 1}')
+                if [ -z "${r}" ]; then
+                    echo "${container[0]}"
+					break
+                fi
+            fi
+        done)
+        if [ -n "${c}" ]; then
+            echo "${c} not ready"
+            sleep 5
+        else
+            echo -e 'All containers ready\n'
+            break
+        fi
+	done
 }
 
 function add_services(){
@@ -297,7 +318,8 @@ function set_network_rule(){
 }
 
 function show_url(){
-	${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}" | tail -1
+    echo -e 'Front load balancer informations\n'
+	${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}"
 }
 
 create_project
@@ -306,5 +328,5 @@ set_network_rule
 
 # Show all
 display_env_vars
-show_containers
+wait_containers
 show_url
