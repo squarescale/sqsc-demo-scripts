@@ -48,7 +48,7 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.5-2020-12-12"
+SCRIPT_VERSION="1.6-2020-12-19"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -136,8 +136,8 @@ function wait_for_project_scheduling() {
 	echo "Waiting for project to be able to schedule containers"
 	while true; do
 		# shellcheck disable=SC2207
-		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*" | awk '$NF ~ /[0-9][0-9]*\/[0-9][0-9]*/ {print $NF;exit}{print $(NF-1)}' | sed -e 's?/? ?'))
-		if [ "${available[0]}" != "${available[1]}" ] || [ "${available[0]}" == "0" ]; then
+		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*.*\s\s*ok\s\s*" | awk '$NF ~ /[0-9][0-9]*\/[0-9][0-9]*/ {print $NF;exit}{print $(NF-1)}' | sed -e 's?/? ?'))
+		if [ "${available[0]}" != "${available[1]}" ] || [ "${available[0]}" == "0" ] || [ -z "${available[0]}" ]; then
 			echo "Project ${PROJECT_NAME} is not ready to schedule any containers yet"
 			sleep 5
 		else
