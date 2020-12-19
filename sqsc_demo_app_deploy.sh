@@ -214,6 +214,12 @@ function create_project(){
 	projects=$(${SQSC_BIN} project list)
 	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
+		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
+			echo "${PROJECT_NAME} starting provisionning..."
+			${SQSC_BIN} project provision -project-name "${PROJECT_NAME}"
+		else
+			echo "${PROJECT_NAME} already provisionning. Skipping..."
+		fi
 	else
 		if [ -n "${SLACK_WEB_HOOK}" ]; then
 			SLACK_OPTIONS="-slackbot ${SLACK_WEB_HOOK}"
