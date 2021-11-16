@@ -48,7 +48,7 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.6-2020-12-19"
+SCRIPT_VERSION="1.7-2021-11-16"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
