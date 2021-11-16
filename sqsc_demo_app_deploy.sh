@@ -205,7 +205,7 @@ function add_docker_database(){
 	set_env_var PROJECT_DB_NAME "dbmain"
 	# All variables are defined before container launch to avoid
 	# un-necessary re-scheduling due to environment changes
-	add_service "${POSTGRES_DOCKER_IMAGE:-postgres}"
+	add_service "${POSTGRES_DOCKER_IMAGE:-postgres:10}"
 }
 
 # Function creating the project
