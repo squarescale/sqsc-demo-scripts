@@ -74,10 +74,10 @@ DEFAULT_PG_VERSION=${DEFAULT_PG_VERSION:-"10"}
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
 # Remove non printable chars
-PROJECT_NAME=$(echo "${1:-"sqsc-demo"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[:print:]')
+PROJECT_NAME=$(echo "${1:-"sqsc-fractal-demo"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[:print:]')
 
 if [ -z "${PROJECT_NAME}" ]; then
-	echo "${1:-"sqsc-demo"} is not a valid project name (non-printable characters)"
+	echo "${1:-"sqsc-fractal-demo"} is not a valid project name (non-printable characters)"
 	exit 1
 fi
 
