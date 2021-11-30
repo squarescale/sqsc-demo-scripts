@@ -285,12 +285,12 @@ function add_services(){
 
 function set_network_rule(){
 	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name web)
-	if echo "$net_rule" | grep -Eq '^sqsc-demo-app\s*http/3000\s*http/80\s*'; then
+	if echo "$net_rule" | grep -Eq '^web\s*http/9090\s*http/80\s*'; then
 		echo "Network rule already configured. Skipping..."
 	else
 		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
 		echo "Adding network rule"
-		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "sqsc-demo-app" -internal-protocol "http" -internal-port 3000 -external-protocol "http" -service-name "sqsc-demo-app"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "web" -internal-protocol "http" -internal-port 9090 -external-protocol "http" -service-name "web"
 	fi
 }
 
@@ -301,7 +301,7 @@ function show_url(){
 
 create_project
 add_services
-#set_network_rule
+set_network_rule
 
 wait_containers
 show_url
