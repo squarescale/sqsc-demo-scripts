@@ -136,8 +136,13 @@ function wait_for_project_scheduling() {
 	echo "Waiting for project to be able to schedule containers"
 	while true; do
 		# shellcheck disable=SC2207
-		available=($(${SQSC_BIN} project list | grep -E "^${PROJECT_NAME}\s\s*.*\s\s*ok\s\s*" | awk '$NF ~ /[0-9][0-9]*\/[0-9][0-9]*/ {print $NF;exit}{print $(NF-1)}' | sed -e 's?/? ?'))
-		if [ "${available[0]}" != "${available[1]}" ] || [ "${available[0]}" == "0" ] || [ -z "${available[0]}" ]; then
+		eval $(${SQSC_BIN} project get -project-name "${PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')
+		if [ "${Status}" == "error" ]; then
+			echo "${PROJECT_NAME} provisionning has encountered an error"
+			exit 1
+		fi
+		available=($(echo "${Nodes}" | sed -e 's?/? ?'))
+		if [ "${Status}" != "ok" ] || [ "${available[0]}" == "0" ] || [ -z "${available[0]}" ]; then
 			echo "Project ${PROJECT_NAME} is not ready to schedule any containers yet"
 			sleep 5
 		else
