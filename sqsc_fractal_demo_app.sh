@@ -161,7 +161,7 @@ function wait_for_project_scheduling() {
 #
 function add_service() {
 	wait_for_project_scheduling
-	container_image=$(echo "$1" | awk -F/ '{print $NF}')
+	container_image=$(echo "$1" | awk -F/ '{print $NF}' | awk -F: '{print $1}')
 	cur_containers=$(show_containers)
 	if echo "$cur_containers" | grep -Eq "^${container_image}\s\s*"; then
 		echo "${PROJECT_NAME} already configured with service container $container_image. Skipping..."
