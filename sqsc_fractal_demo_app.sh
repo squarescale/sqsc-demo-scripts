@@ -217,6 +217,9 @@ function create_project(){
 		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
 			${SQSC_BIN} project provision -project-name "${PROJECT_NAME}"
+		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*error\s\s*"; then
+			echo "${PROJECT_NAME} provisionning has encountered an error"
+			exit 1
 		else
 			echo "${PROJECT_NAME} already provisionning. Skipping..."
 		fi
