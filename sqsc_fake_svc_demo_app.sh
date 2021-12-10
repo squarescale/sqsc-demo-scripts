@@ -21,7 +21,7 @@
 # Default Docker hub images for all services can be customized/changed by
 # using the appropriate variable
 #
-# FAKESERVICE_DOCKER_IMAGE: default to nicholasjackson/fake-service:v0.22.9
+# FAKESERVICE_DOCKER_IMAGE: default to obourdon/fake-service:v0.22.10
 #
 # VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka small
 #
@@ -37,7 +37,10 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.0-2021-11-26"
+SCRIPT_VERSION="1.1-2021-12-07"
+
+# Originally nicholasjackson/fake-service:v0.22.9
+FAKESERVICE_DOCKER_IMAGE="${FAKESERVICE_DOCKER_IMAGE:-obourdon/fake-service:v0.22.10}"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -47,11 +50,14 @@ echo -e "\nRunning $(basename "${BASH_SOURCE[0]}") version ${SCRIPT_VERSION}\n"
 # Exit on errors
 set -e
 
-# Set infra instances size (small, medium, large, dev, xsmall).
+# Set infrastructure instances size (small, medium, large, dev, xsmall).
 # Default is medium because of RabbitMQ requirements
 #
-INFRA_NODE_SIZE=${VM_SIZE:-"medium"}
-INFRA_TYPE=${INFRA_TYPE:-"single-node"}
+INFRA_NODE_SIZE=${VM_SIZE:-"small"}
+
+# Set infrastructure type to high-availability (can also be single-node)
+#
+INFRA_TYPE=${INFRA_TYPE:-"high-availability"}
 
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
@@ -177,6 +183,7 @@ function add_service() {
 	set_svc_env_var "$1" MESSAGE "Hello from $1"
 	set_svc_env_var "$1" SERVER_TYPE "http"
 	set_svc_env_var "$1" TIMING_VARIANCE 10
+	set_svc_env_var "$1" ALLOW_CLOUD_METADATA "true"
 }
 
 # Function creating the project
@@ -251,14 +258,14 @@ function wait_containers(){
 }
 
 function add_services(){
-	add_service web "${FAKESERVICE_DOCKER_IMAGE:-nicholasjackson/fake-service:v0.22.9}"
+	add_service web "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var web TIMING_50_PERCENTILE 30ms
 	set_svc_env_var web TIMING_90_PERCENTILE 60ms
 	set_svc_env_var web TIMING_99_PERCENTILE 90ms
 	set_svc_env_var web UPSTREAM_URIS "http://api.service.consul:9090"
 	#set_svc_env_var web TRACING_ZIPKIN "http://jaeger.service.consul:9411"
 	#set_svc_env_var web LOG_LEVEL debug
-	add_service api "${FAKESERVICE_DOCKER_IMAGE:-nicholasjackson/fake-service:v0.22.9}"
+	add_service api "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var api TIMING_50_PERCENTILE 20ms
 	set_svc_env_var api TIMING_90_PERCENTILE 30ms
 	set_svc_env_var api TIMING_99_PERCENTILE 40ms
@@ -266,16 +273,16 @@ function add_services(){
 	set_svc_env_var api UPSTREAM_WORKERS 2
 	set_svc_env_var api HTTP_CLIENT_APPEND_REQUEST "true"
 	#set_svc_env_var api TRACING_ZIPKIN "http://jaeger.service.consul:9411"
-	add_service cache "${FAKESERVICE_DOCKER_IMAGE:-nicholasjackson/fake-service:v0.22.9}"
+	add_service cache "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var cache TIMING_50_PERCENTILE 1ms
 	set_svc_env_var cache TIMING_90_PERCENTILE 2ms
 	set_svc_env_var cache TIMING_99_PERCENTILE 3ms
 	#set_svc_env_var cache TRACING_ZIPKIN "http://jaeger.service.consul:9411"
-	add_service payments "${FAKESERVICE_DOCKER_IMAGE:-nicholasjackson/fake-service:v0.22.9}"
+	add_service payments "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var payments HTTP_CLIENT_APPEND_REQUEST "true"
 	set_svc_env_var payments UPSTREAM_URIS "grpc://currency.service.consul:9090"
 	#set_svc_env_var payments TRACING_ZIPKIN "http://jaeger.service.consul:9411"
-	add_service currency "${FAKESERVICE_DOCKER_IMAGE:-nicholasjackson/fake-service:v0.22.9}"
+	add_service currency "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var currency SERVER_TYPE "grpc"
 	set_svc_env_var currency ERROR_RATE 0.2
 	set_svc_env_var currency ERROR_CODE 14
