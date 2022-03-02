@@ -37,10 +37,14 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.1-2021-12-07"
+SCRIPT_VERSION="1.1-2022-01-25"
 
 # Originally nicholasjackson/fake-service:v0.22.9
-FAKESERVICE_DOCKER_IMAGE="${FAKESERVICE_DOCKER_IMAGE:-obourdon/fake-service:v0.22.10}"
+FAKESERVICE_DOCKER_IMAGE="${FAKESERVICE_DOCKER_IMAGE:-obourdon/fake-service:0.23.2-test}"
+
+# Original port is 9090 (fake-service) but it does not work for the UI part so it can be changed to 80 (Nginx)
+FAKESERVICE_PORT="${FAKESERVICE_PORT:-9090}"
+FAKESERVICE_UI_PORT="${FAKESERVICE_UI_PORT:-80}"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -248,7 +252,7 @@ function wait_containers(){
             fi
         done)
         if [ -n "${c}" ]; then
-            echo "${c} not ready"
+            echo "Service container ${c} not ready"
             sleep 5
         else
             echo -e 'All containers ready\n'
@@ -262,14 +266,14 @@ function add_services(){
 	set_svc_env_var web TIMING_50_PERCENTILE 30ms
 	set_svc_env_var web TIMING_90_PERCENTILE 60ms
 	set_svc_env_var web TIMING_99_PERCENTILE 90ms
-	set_svc_env_var web UPSTREAM_URIS "http://api.service.consul:9090"
+	set_svc_env_var web UPSTREAM_URIS "http://api.service.consul:${FAKESERVICE_PORT}"
 	#set_svc_env_var web TRACING_ZIPKIN "http://jaeger.service.consul:9411"
 	#set_svc_env_var web LOG_LEVEL debug
 	add_service api "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var api TIMING_50_PERCENTILE 20ms
 	set_svc_env_var api TIMING_90_PERCENTILE 30ms
 	set_svc_env_var api TIMING_99_PERCENTILE 40ms
-	set_svc_env_var api UPSTREAM_URIS "grpc://currency.service.consul:9090, http://cache.service.consul:9090/abc/123123, http://payments.service.consul:9090"
+	set_svc_env_var api UPSTREAM_URIS "grpc://currency.service.consul:${FAKESERVICE_PORT}, http://cache.service.consul:${FAKESERVICE_PORT}/abc/123123, http://payments.service.consul:${FAKESERVICE_PORT}"
 	set_svc_env_var api UPSTREAM_WORKERS 2
 	set_svc_env_var api HTTP_CLIENT_APPEND_REQUEST "true"
 	#set_svc_env_var api TRACING_ZIPKIN "http://jaeger.service.consul:9411"
@@ -280,7 +284,7 @@ function add_services(){
 	#set_svc_env_var cache TRACING_ZIPKIN "http://jaeger.service.consul:9411"
 	add_service payments "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var payments HTTP_CLIENT_APPEND_REQUEST "true"
-	set_svc_env_var payments UPSTREAM_URIS "grpc://currency.service.consul:9090"
+	set_svc_env_var payments UPSTREAM_URIS "grpc://currency.service.consul:${FAKESERVICE_PORT}"
 	#set_svc_env_var payments TRACING_ZIPKIN "http://jaeger.service.consul:9411"
 	add_service currency "${FAKESERVICE_DOCKER_IMAGE}"
 	set_svc_env_var currency SERVER_TYPE "grpc"
@@ -292,12 +296,12 @@ function add_services(){
 
 function set_network_rule(){
 	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name web)
-	if echo "$net_rule" | grep -Eq '^web\s*http/9090\s*http/80\s*'; then
+	if echo "$net_rule" | grep -Eq "^web\s*http/${FAKESERVICE_UI_PORT}\s*http/80\s*"; then
 		echo "Network rule already configured. Skipping..."
 	else
 		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
 		echo "Adding network rule"
-		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "web" -internal-protocol "http" -internal-port 9090 -external-protocol "http" -service-name "web"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "web" -internal-protocol "http" -internal-port ${FAKESERVICE_UI_PORT} -external-protocol "http" -service-name "web"
 	fi
 }
 
