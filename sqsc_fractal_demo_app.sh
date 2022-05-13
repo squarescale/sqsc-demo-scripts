@@ -123,8 +123,8 @@ CLOUD_PROVIDER=${CLOUD_PROVIDER:-"aws"}
 CLOUD_REGION=${CLOUD_REGION:-"eu-west-1"}
 CLOUD_CREDENTIALS=${CLOUD_CREDENTIALS:-""}
 
-if [[ -z "${CLOUD_PROVIDER}" || ( "${CLOUD_PROVIDER}" != "aws" && "${CLOUD_PROVIDER}" != "azure" ) ]]; then
-	echo "CLOUD_PROVIDER=${CLOUD_PROVIDER} unsupported (only aws/azure)"
+if [[ -z "${CLOUD_PROVIDER}" || ( "${CLOUD_PROVIDER}" != "aws" && "${CLOUD_PROVIDER}" != "azure"  && "${CLOUD_PROVIDER}" != "outscale" ) ]]; then
+	echo "CLOUD_PROVIDER=${CLOUD_PROVIDER} unsupported (only aws/azure/outscale)"
 	exit 1
 fi
 
