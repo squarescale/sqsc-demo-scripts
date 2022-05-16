@@ -81,6 +81,11 @@ if [ -z "${PROJECT_NAME}" ]; then
 	exit 1
 fi
 
+FULL_PROJECT_NAME="${PROJECT_NAME}"
+if [ -n "${ORGANIZATION}" ]; then
+	FULL_PROJECT_NAME="${ORGANIZATION}/${PROJECT_NAME}"
+fi
+
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
@@ -136,7 +141,7 @@ function wait_for_project_scheduling() {
 	echo "Waiting for project to be able to schedule containers"
 	while true; do
 		# shellcheck disable=SC2207
-		eval "$(${SQSC_BIN} project get -project-name "${PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
+		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
 		# shellcheck disable=SC2154
 		if [ "${Status}" == "error" ]; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
@@ -219,11 +224,13 @@ function add_docker_database(){
 # this is the main entry point
 function create_project(){
 	projects=$(${SQSC_BIN} project list)
+	# TODO: take organization into account for proper retrieval (creation OK)
+	# in case project with same name but no org or not same org
 	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
 		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
-			${SQSC_BIN} project provision -project-name "${PROJECT_NAME}"
+			${SQSC_BIN} project provision ${ORG_OPTIONS} -project-name "${FULL_PROJECT_NAME}"
 		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
@@ -231,6 +238,9 @@ function create_project(){
 			echo "${PROJECT_NAME} already provisionning. Skipping..."
 		fi
 	else
+		if [ -n "${ORGANIZATION}" ]; then
+			ORG_OPTIONS="-organization ${ORGANIZATION}"
+		fi
 		if [ -n "${SLACK_WEB_HOOK}" ]; then
 			SLACK_OPTIONS="-slackbot ${SLACK_WEB_HOOK}"
 		fi
@@ -239,9 +249,9 @@ function create_project(){
 			exit 1
 		fi
 		if [ -z "${DOCKER_DB}" ]; then
-			eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		else
-			eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		fi
 		projects=$(${SQSC_BIN} project list)
 	fi
