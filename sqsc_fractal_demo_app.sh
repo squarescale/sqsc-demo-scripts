@@ -29,7 +29,7 @@
 # POSTGRES_DOCKER_IMAGE: default to postgres
 # RABBITMQ_DOCKER_IMAGE: default to rabbitmq
 # WORKER_DOCKER_IMAGE:   default to squarescale/sqsc-demo-worker
-# APP_DOCKER_IMAGE:      default to squarescale/sqsc-demo-app
+# APP_DOCKER_IMAGE:	 default to squarescale/sqsc-demo-app
 #
 # VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka small
 #
@@ -139,6 +139,9 @@ fi
 #
 function wait_for_project_scheduling() {
 	echo "Waiting for project to be able to schedule containers"
+	if [ -n "${DRY_RUN}" ]; then
+		return
+	fi
 	while true; do
 		# shellcheck disable=SC2207
 		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
@@ -230,7 +233,7 @@ function create_project(){
 		echo "${PROJECT_NAME} already created. Skipping..."
 		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
-			${SQSC_BIN} project provision ${ORG_OPTIONS} -project-name "${FULL_PROJECT_NAME}"
+			${SQSC_BIN} project provision "${ORG_OPTIONS}" -project-name "${FULL_PROJECT_NAME}"
 		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
@@ -302,27 +305,31 @@ function display_env_vars(){
 }
 
 function show_containers(){
-       ${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
+	${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
 }
 
 function wait_containers(){
-    while true; do
-        c=$(show_containers | while read -r -a container; do
+	echo "Waiting for containers to be running"
+	if [ -n "${DRY_RUN}" ]; then
+		return
+	fi
+	while true; do
+		c=$(show_containers | while read -r -a container; do
 			if [ "${container[0]}" != "Name" ]; then
-                r=$(echo "${container[1]}" | awk -F/ '$1==$2{print 1}')
-                if [ -z "${r}" ]; then
-                    echo "${container[0]}"
+				r=$(echo "${container[1]}" | awk -F/ '$1==$2{print 1}')
+				if [ -z "${r}" ]; then
+					echo "${container[0]}"
 					break
-                fi
-            fi
-        done)
-        if [ -n "${c}" ]; then
-            echo "${c} not ready"
-            sleep 5
-        else
-            echo -e 'All containers ready\n'
-            break
-        fi
+				fi
+			fi
+		done)
+		if [ -n "${c}" ]; then
+			echo "${c} not ready"
+			sleep 5
+		else
+			echo -e 'All containers ready\n'
+			break
+		fi
 	done
 }
 
@@ -344,7 +351,7 @@ function set_network_rule(){
 }
 
 function show_url(){
-    echo -e 'Front load balancer informations\n'
+	echo -e 'Front load balancer informations\n'
 	${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}"
 }
 
