@@ -227,14 +227,14 @@ function add_docker_database(){
 # this is the main entry point
 function create_project(){
 	projects=$(${SQSC_BIN} project list)
-	# TODO: take organization into account for proper retrieval (creation OK)
+	# take organization into account for proper retrieval (creation OK)
 	# in case project with same name but no org or not same org
-	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"; then
+	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
-		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
+		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
 			${SQSC_BIN} project provision "${ORG_OPTIONS}" -project-name "${FULL_PROJECT_NAME}"
-		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*error\s\s*"; then
+		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
 		else
