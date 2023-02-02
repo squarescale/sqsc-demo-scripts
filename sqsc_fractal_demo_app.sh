@@ -89,7 +89,7 @@ fi
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.0.8"
+REQUIRED_SQSC_VERSION="1.1.3"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
@@ -175,11 +175,11 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image"
-		${SQSC_BIN} image add -project-uuid "${PROJECT_UUID}" -name "$1"
+		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -image "$1"
 	fi
 	if [ -n "$2" ]; then
 		echo "Increasing $1 container memory to $2"
-		${SQSC_BIN} container set -project-uuid "${PROJECT_UUID}" -service "$1" -memory "$2"
+		${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$1" -memory "$2"
 	fi
 }
 
@@ -305,7 +305,7 @@ function display_env_vars(){
 }
 
 function show_containers(){
-	${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
+       ${SQSC_BIN} service list -project-uuid "${PROJECT_UUID}"
 }
 
 function wait_containers(){
