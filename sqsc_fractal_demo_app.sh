@@ -233,12 +233,13 @@ function create_project(){
 	projects=$(${SQSC_BIN} project list)
 	# take organization into account for proper retrieval (creation OK)
 	# in case project with same name but no org or not same org
-	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*"; then
+	search_pattern="^${PROJECT_NAME}\s\s*.*\s\s*${ORGANIZATION}\s\s*"
+	if echo "$projects" | grep -Eq "${search_pattern}"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
-		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*no_infra\s\s*"; then
+		if echo "$projects" | grep -Eq "${search_pattern}no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
 			${SQSC_BIN} project provision "${ORG_OPTIONS}" -project-name "${FULL_PROJECT_NAME}"
-		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*error\s\s*"; then
+		elif echo "$projects" | grep -Eq "${search_pattern}error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
 		else
@@ -262,7 +263,7 @@ function create_project(){
 		fi
 		projects=$(${SQSC_BIN} project list)
 	fi
-	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')
+	PROJECT_UUID=$(echo "$projects" | grep -E "${search_pattern}" | awk '{print $2}')
 
 	# All variables are defined before container launch to avoid
 	# un-necessary re-scheduling due to environment changes
@@ -309,7 +310,7 @@ function display_env_vars(){
 }
 
 function show_containers(){
-       ${SQSC_BIN} service list -project-uuid "${PROJECT_UUID}"
+	${SQSC_BIN} service list -project-uuid "${PROJECT_UUID}"
 }
 
 function wait_containers(){
