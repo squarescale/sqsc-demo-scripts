@@ -48,7 +48,10 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="2.0-2022-09-09"
+# Select multi node or single node deployment
+# INFRA_TYPE can be high-availability (default) or single-node
+
+SCRIPT_VERSION="3.0-2023-02-03"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -62,6 +65,7 @@ set -e
 # Default is medium because of RabbitMQ requirements
 #
 INFRA_NODE_SIZE=${VM_SIZE:-"medium"}
+INFRA_TYPE=${INFRA_TYPE:-"high-availability"}
 
 # Set memory used by RabbitMQ container
 # Default is 4096 because of RabbitMQ requirements
@@ -229,12 +233,13 @@ function create_project(){
 	projects=$(${SQSC_BIN} project list)
 	# take organization into account for proper retrieval (creation OK)
 	# in case project with same name but no org or not same org
-	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*"; then
+	search_pattern="^${PROJECT_NAME}\s\s*.*\s\s*${ORGANIZATION}\s\s*"
+	if echo "$projects" | grep -Eq "${search_pattern}"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
-		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*no_infra\s\s*"; then
+		if echo "$projects" | grep -Eq "${search_pattern}no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
 			${SQSC_BIN} project provision "${ORG_OPTIONS}" -project-name "${FULL_PROJECT_NAME}"
-		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*${ORGANIZATION}\s\s*error\s\s*"; then
+		elif echo "$projects" | grep -Eq "${search_pattern}error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
 		else
@@ -252,13 +257,13 @@ function create_project(){
 			exit 1
 		fi
 		if [ -z "${DOCKER_DB}" ]; then
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		else
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
 		fi
 		projects=$(${SQSC_BIN} project list)
 	fi
-	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')
+	PROJECT_UUID=$(echo "$projects" | grep -E "${search_pattern}" | awk '{print $2}')
 
 	# All variables are defined before container launch to avoid
 	# un-necessary re-scheduling due to environment changes
@@ -305,7 +310,7 @@ function display_env_vars(){
 }
 
 function show_containers(){
-       ${SQSC_BIN} service list -project-uuid "${PROJECT_UUID}"
+	${SQSC_BIN} service list -project-uuid "${PROJECT_UUID}"
 }
 
 function wait_containers(){
