@@ -51,7 +51,7 @@
 # Select multi node or single node deployment
 # INFRA_TYPE can be high-availability (default) or single-node
 
-SCRIPT_VERSION="3.0-2023-02-03"
+SCRIPT_VERSION="3.1-2023-04-20"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -93,7 +93,7 @@ fi
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.1.3"
+REQUIRED_SQSC_VERSION="1.1.4"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
