@@ -179,7 +179,7 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image"
-		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -image "$1"
+		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$1"
 	fi
 	if [ -n "$2" ]; then
 		echo "Increasing $1 container memory to $2"
