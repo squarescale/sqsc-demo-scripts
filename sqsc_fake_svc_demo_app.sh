@@ -181,7 +181,7 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service $1 container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image as job ${1}"
-		${SQSC_BIN} image add -project-uuid "${PROJECT_UUID}" -name "$2" -servicename "$1"
+		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$2" -service "$1"
 	fi
 	set_svc_env_var "$1" NAME "$1"
 	set_svc_env_var "$1" MESSAGE "Hello from $1"
@@ -213,7 +213,7 @@ function create_project(){
 			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
 			exit 1
 		fi
-		eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+		eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')

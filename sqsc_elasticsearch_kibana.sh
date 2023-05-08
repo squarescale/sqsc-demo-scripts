@@ -156,7 +156,7 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image"
-		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -image "$1"
+		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$1"
 	fi
 	if [ -n "$2" ]; then
 		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -name "$container_image" | grep ^Mem | awk '{print $(NF-1)}')
@@ -225,7 +225,7 @@ function create_project(){
 			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
 			exit 1
 		fi
-		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -root-disk-size \"${INFRA_NODE_DISK_SIZE}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -root-disk-size \"${INFRA_NODE_DISK_SIZE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "${search_pattern}" | awk '{print $2}')
@@ -300,7 +300,7 @@ function set_network_rules(){
 	else
 		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
 		echo "Adding network rule for elasticsearch"
-		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "es" -internal-protocol "http" -internal-port 9200 -external-protocol "http" -service-name "elasticsearch" -path-prefix "/"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "es" -internal-protocol "http" -internal-port 9200 -external-protocol "http" -service-name "elasticsearch" -path "/"
 	fi
 	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name kibana)
 	if echo "$net_rule" | grep -Eq '^ki\s*http/5601\s*http/80\s*/kibana$'; then
@@ -308,7 +308,7 @@ function set_network_rules(){
 	else
 		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
 		echo "Adding network rule for kibana"
-		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "ki" -internal-protocol "http" -internal-port 5601 -external-protocol "http" -service-name "kibana" -path-prefix "/kibana"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "ki" -internal-protocol "http" -internal-port 5601 -external-protocol "http" -service-name "kibana" -path "/kibana"
 	fi
 }
 
