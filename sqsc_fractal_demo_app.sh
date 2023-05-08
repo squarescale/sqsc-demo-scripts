@@ -51,7 +51,7 @@
 # Select multi node or single node deployment
 # INFRA_TYPE can be high-availability (default) or single-node
 
-SCRIPT_VERSION="3.1-2023-04-20"
+SCRIPT_VERSION="3.1-2023-05-06"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -182,8 +182,13 @@ function add_service() {
 		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$1"
 	fi
 	if [ -n "$2" ]; then
-		echo "Increasing $1 container memory to $2"
-		${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$1" -memory "$2"
+		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -name "$container_image" | grep ^Mem | awk '{print $(NF-1)}')
+		if [ "$cur_val" != "$2" ]; then
+			echo "Increasing $1 container memory to $2"
+			${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$container_image" -memory "$2"
+		else
+			echo "$1 container memory already set to $2"
+		fi
 	fi
 }
 

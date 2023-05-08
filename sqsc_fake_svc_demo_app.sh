@@ -37,7 +37,7 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.1-2022-01-25"
+SCRIPT_VERSION="1.2-2023-05-06"
 
 # Originally nicholasjackson/fake-service:v0.22.9
 FAKESERVICE_DOCKER_IMAGE="${FAKESERVICE_DOCKER_IMAGE:-obourdon/fake-service:0.23.2-test}"
@@ -76,7 +76,7 @@ fi
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.0.8"
+REQUIRED_SQSC_VERSION="1.1.4"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
