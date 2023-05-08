@@ -59,9 +59,9 @@ set -e
 #
 INFRA_NODE_SIZE=${VM_SIZE:-"small"}
 
-# Set infrastructure type to high-availability (can also be single-node)
+# Set infrastructure type to single-node (can also be high-availability)
 #
-INFRA_TYPE=${INFRA_TYPE:-"high-availability"}
+INFRA_TYPE=${INFRA_TYPE:-"single-node"}
 
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
@@ -131,9 +131,12 @@ fi
 #
 function wait_for_project_scheduling() {
 	echo "Waiting for project to be able to schedule containers"
+	if [ -n "${DRY_RUN}" ]; then
+		return
+	fi
 	while true; do
 		# shellcheck disable=SC2207
-		eval "$(${SQSC_BIN} project get -project-name "${PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
+		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
 		# shellcheck disable=SC2154
 		if [ "${Status}" == "error" ]; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
@@ -159,14 +162,14 @@ function wait_for_project_scheduling() {
 # 3) Environment variable value
 #
 function set_svc_env_var(){
-	evs=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" -container "$1" 2>/dev/null | awk 'NF>0{print}' | sed -e 's/=/="/' -e 's/$/"/')
+	evs=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" -service "$1" 2>/dev/null | awk 'NF>0{print}' | sed -e 's/=/="/' -e 's/$/"/')
 	eval $(echo "$evs")
 	ev=$2
 	v=${!ev}
 	if [ "$v" == "$3" ]; then
 		echo "$2 already set to $3 for service $1. Skipping..."
 	else
-		${SQSC_BIN} env set -project-uuid "${PROJECT_UUID}" -container "$1" "$2" "$3"
+		${SQSC_BIN} env set -project-uuid "${PROJECT_UUID}" -service "$1" "$2" "$3"
 	fi
 	# reset all vars previously defined
 	eval $(echo "$evs" | awk -F= '{printf "unset %s\n",$1}')
@@ -199,7 +202,10 @@ function add_service() {
 # this is the main entry point
 function create_project(){
 	projects=$(${SQSC_BIN} project list)
-	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"; then
+	# take organization into account for proper retrieval (creation OK)
+	# in case project with same name but no org or not same org
+	search_pattern="^${PROJECT_NAME}\s\s*.*\s\s*${ORGANIZATION}\s\s*"
+	if echo "$projects" | grep -Eq "${search_pattern}"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
 		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
@@ -245,7 +251,7 @@ function create_project(){
 }
 
 function show_containers(){
-       ${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
+       ${SQSC_BIN} service list -project-uuid "${PROJECT_UUID}"
 }
 
 function wait_containers(){
