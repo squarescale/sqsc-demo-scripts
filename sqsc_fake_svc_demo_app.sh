@@ -73,6 +73,11 @@ if [ -z "${PROJECT_NAME}" ]; then
 	exit 1
 fi
 
+FULL_PROJECT_NAME="${PROJECT_NAME}"
+if [ -n "${ORGANIZATION}" ]; then
+	FULL_PROJECT_NAME="${ORGANIZATION}/${PROJECT_NAME}"
+fi
+
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
@@ -198,7 +203,7 @@ function create_project(){
 		echo "${PROJECT_NAME} already created. Skipping..."
 		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
-			${SQSC_BIN} project provision -project-name "${PROJECT_NAME}"
+			${SQSC_BIN} project provision -project-name "${FULL_PROJECT_NAME}"
 		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
@@ -206,6 +211,9 @@ function create_project(){
 			echo "${PROJECT_NAME} already provisionning. Skipping..."
 		fi
 	else
+		if [ -n "${ORGANIZATION}" ]; then
+			ORG_OPTIONS="-organization ${ORGANIZATION}"
+		fi
 		if [ -n "${SLACK_WEB_HOOK}" ]; then
 			SLACK_OPTIONS="-slackbot ${SLACK_WEB_HOOK}"
 		fi
@@ -213,7 +221,7 @@ function create_project(){
 			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
 			exit 1
 		fi
-		eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
+		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')
