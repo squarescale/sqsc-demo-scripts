@@ -37,7 +37,7 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.1-2022-01-25"
+SCRIPT_VERSION="1.2-2023-05-06"
 
 # Originally nicholasjackson/fake-service:v0.22.9
 FAKESERVICE_DOCKER_IMAGE="${FAKESERVICE_DOCKER_IMAGE:-obourdon/fake-service:0.23.2-test}"
@@ -59,9 +59,9 @@ set -e
 #
 INFRA_NODE_SIZE=${VM_SIZE:-"small"}
 
-# Set infrastructure type to high-availability (can also be single-node)
+# Set infrastructure type to single-node (can also be high-availability)
 #
-INFRA_TYPE=${INFRA_TYPE:-"high-availability"}
+INFRA_TYPE=${INFRA_TYPE:-"single-node"}
 
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
@@ -73,10 +73,15 @@ if [ -z "${PROJECT_NAME}" ]; then
 	exit 1
 fi
 
+FULL_PROJECT_NAME="${PROJECT_NAME}"
+if [ -n "${ORGANIZATION}" ]; then
+	FULL_PROJECT_NAME="${ORGANIZATION}/${PROJECT_NAME}"
+fi
+
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.0.8"
+REQUIRED_SQSC_VERSION="1.1.4"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
@@ -126,9 +131,12 @@ fi
 #
 function wait_for_project_scheduling() {
 	echo "Waiting for project to be able to schedule containers"
+	if [ -n "${DRY_RUN}" ]; then
+		return
+	fi
 	while true; do
 		# shellcheck disable=SC2207
-		eval "$(${SQSC_BIN} project get -project-name "${PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
+		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
 		# shellcheck disable=SC2154
 		if [ "${Status}" == "error" ]; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
@@ -154,14 +162,14 @@ function wait_for_project_scheduling() {
 # 3) Environment variable value
 #
 function set_svc_env_var(){
-	evs=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" -container "$1" 2>/dev/null | awk 'NF>0{print}' | sed -e 's/=/="/' -e 's/$/"/')
+	evs=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" -service "$1" 2>/dev/null | awk 'NF>0{print}' | sed -e 's/=/="/' -e 's/$/"/')
 	eval $(echo "$evs")
 	ev=$2
 	v=${!ev}
 	if [ "$v" == "$3" ]; then
 		echo "$2 already set to $3 for service $1. Skipping..."
 	else
-		${SQSC_BIN} env set -project-uuid "${PROJECT_UUID}" -container "$1" "$2" "$3"
+		${SQSC_BIN} env set -project-uuid "${PROJECT_UUID}" -service "$1" "$2" "$3"
 	fi
 	# reset all vars previously defined
 	eval $(echo "$evs" | awk -F= '{printf "unset %s\n",$1}')
@@ -181,7 +189,7 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service $1 container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image as job ${1}"
-		${SQSC_BIN} image add -project-uuid "${PROJECT_UUID}" -name "$2" -servicename "$1"
+		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$2" -service "$1"
 	fi
 	set_svc_env_var "$1" NAME "$1"
 	set_svc_env_var "$1" MESSAGE "Hello from $1"
@@ -194,11 +202,14 @@ function add_service() {
 # this is the main entry point
 function create_project(){
 	projects=$(${SQSC_BIN} project list)
-	if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*"; then
+	# take organization into account for proper retrieval (creation OK)
+	# in case project with same name but no org or not same org
+	search_pattern="^${PROJECT_NAME}\s\s*.*\s\s*${ORGANIZATION}\s\s*"
+	if echo "$projects" | grep -Eq "${search_pattern}"; then
 		echo "${PROJECT_NAME} already created. Skipping..."
 		if echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
-			${SQSC_BIN} project provision -project-name "${PROJECT_NAME}"
+			${SQSC_BIN} project provision -project-name "${FULL_PROJECT_NAME}"
 		elif echo "$projects" | grep -Eq "^${PROJECT_NAME}\s\s*.*\s\s*error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
@@ -206,6 +217,9 @@ function create_project(){
 			echo "${PROJECT_NAME} already provisionning. Skipping..."
 		fi
 	else
+		if [ -n "${ORGANIZATION}" ]; then
+			ORG_OPTIONS="-organization ${ORGANIZATION}"
+		fi
 		if [ -n "${SLACK_WEB_HOOK}" ]; then
 			SLACK_OPTIONS="-slackbot ${SLACK_WEB_HOOK}"
 		fi
@@ -213,7 +227,7 @@ function create_project(){
 			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
 			exit 1
 		fi
-		eval "${SQSC_BIN} project create ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -name \"${PROJECT_NAME}\""
+		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')
@@ -237,7 +251,7 @@ function create_project(){
 }
 
 function show_containers(){
-       ${SQSC_BIN} container list -project-uuid "${PROJECT_UUID}"
+       ${SQSC_BIN} service list -project-uuid "${PROJECT_UUID}"
 }
 
 function wait_containers(){

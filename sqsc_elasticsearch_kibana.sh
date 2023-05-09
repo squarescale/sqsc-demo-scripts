@@ -2,13 +2,10 @@
 #
 # See http://docs.squarescale.com/CLI.html for more informations about sqsc CLI
 #
-# This script is used to deploy the SquareScale fractal demo
+# This script is used to deploy the SquareScale ElasticSearch + Kibana public project
 #
 # If a parameter is passed on the command line, it is taken as the name of the project
 # to be created
-#
-# If a second parameter is passed, it is used as the base GitHub account of the cloned sqsc-demo-*
-# (instead of squarescale organization)
 #
 # It can also be customized via a set of environment variables
 #
@@ -17,23 +14,14 @@
 # SQSC_TOKEN: security token generated via API Keys menu on platform endpoint
 # and used to run `sqsc login` successfully
 #
-# DOCKER_DB: default to empty which means use RDS based Postgres. Setting this to anything will speed
-# 	up the demo startup time because of the use of Postgres Docker container
-#
 # DRY_RUN: default to empty. Setting this to anything will show calls to be made by sqsc instead of
 #	running them
 #
-# Default Docker hub images for all services can be customized/changed by
-# using the appropriate variable
+# VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka large
+# DISK_SIZE: Default is 60Gb
 #
-# POSTGRES_DOCKER_IMAGE: default to postgres
-# RABBITMQ_DOCKER_IMAGE: default to rabbitmq
-# WORKER_DOCKER_IMAGE:   default to squarescale/sqsc-demo-worker
-# APP_DOCKER_IMAGE:	 default to squarescale/sqsc-demo-app
-#
-# VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka small
-#
-# RABBITMQ_RAM_SIZE: memory used by RabbitMQ container. Default is 4096
+# RAM_SIZE: memory used by containers. Default is 4096
+# CPU_SIZE: CPU used by containers. Default is 1000Mhz
 #
 # Since version 1.4 of this script, multi-cloud providers support has been added
 # and therefore the following environment variables have been added
@@ -42,16 +30,13 @@
 # CLOUD_REGION: default to eu-west-1
 # CLOUD_CREDENTIALS: default to ""
 #
-# Support for multiple databases version has also been added
-# DEFAULT_PG_VERSION: default to 10
-#
-# Monitoring via netdata can be activated on project deployment
-# MONITORING=netdata # default to ""
+# Support for multiple versions has also been added
+# DEFAULT_VERSION: default to 7.10.2
 #
 # Select multi node or single node deployment
-# INFRA_TYPE can be high-availability (default) or single-node
+# INFRA_TYPE can be high-availabilityor single-node (default)
 
-SCRIPT_VERSION="3.1-2023-05-06"
+SCRIPT_VERSION="1.0-2023-05-05"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -64,24 +49,25 @@ set -e
 # Set infra instances size (small, medium, large, dev, xsmall).
 # Default is medium because of RabbitMQ requirements
 #
-INFRA_NODE_SIZE=${VM_SIZE:-"medium"}
-INFRA_TYPE=${INFRA_TYPE:-"high-availability"}
+INFRA_NODE_SIZE=${VM_SIZE:-"large"}
+INFRA_NODE_DISK_SIZE=${DISK_SIZE:-"60"}
+INFRA_TYPE=${INFRA_TYPE:-"single-node"}
 
-# Set memory used by RabbitMQ container
-# Default is 4096 because of RabbitMQ requirements
+# Set memory used by containers
 #
-RABBITMQ_RAM_SIZE=${RABBITMQ_RAM_SIZE:-"4096"}
+RAM_SIZE=${RAM_SIZE:-"4096"}
+CPU_SIZE=${CPU_SIZE:-"1000"}
 
 # Default Postgres RDS version
-DEFAULT_PG_VERSION=${DEFAULT_PG_VERSION:-"10"}
+DEFAULT_VERSION=${DEFAULT_VERSION:-"7.10.2"}
 
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
 # Remove non printable chars
-PROJECT_NAME=$(echo "${1:-"sqsc-fractal-demo"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[:print:]')
+PROJECT_NAME=$(echo "${1:-"sqsc-elasticsearch-kibana"}" | tr '[:upper:]' '[:lower:]' | tr -dc '[:print:]')
 
 if [ -z "${PROJECT_NAME}" ]; then
-	echo "${1:-"sqsc-fractal-demo"} is not a valid project name (non-printable characters)"
+	echo "${1:-"sqsc-elasticsearch-kibana"} is not a valid project name (non-printable characters)"
 	exit 1
 fi
 
@@ -128,16 +114,6 @@ if [[ -z "${CLOUD_PROVIDER}" || ( "${CLOUD_PROVIDER}" != "aws" && "${CLOUD_PROVI
 	exit 1
 fi
 
-# Add monitoring to deployment
-MONITORING=${MONITORING:-""}
-if [ -n "${MONITORING}" ]; then
-	if [ "${MONITORING}" != "netdata" ]; then
-		echo "MONITORING=${MONITORING} unsupported (only netdata)"
-		exit 1
-	fi
-	MONITORING_OPTIONS="-monitoring ${MONITORING}"
-fi
-
 # Function which wait for project cluster to
 # be able to schedule containers
 #
@@ -170,6 +146,7 @@ function wait_for_project_scheduling() {
 # Parameters:
 # 1) Docker Hub container image name
 # 2) Memory size required (optional)
+# 3) CPU size required (optional)
 #
 function add_service() {
 	wait_for_project_scheduling
@@ -188,6 +165,15 @@ function add_service() {
 			${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$container_image" -memory "$2"
 		else
 			echo "$1 container memory already set to $2"
+		fi
+	fi
+	if [ -n "$3" ]; then
+		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -name "$container_image" | grep ^CPU | awk '{print $(NF-1)}')
+		if [ "$cur_val" != "$3" ]; then
+			echo "Increasing $1 container CPU to $3"
+			${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$container_image" -cpu "$3"
+		else
+			echo "$1 container CPU already set to $3"
 		fi
 	fi
 }
@@ -210,28 +196,6 @@ function set_env_var(){
 	set -e
 }
 
-# Function which creates containerized database
-# (as opposed to using RDS based version)
-function add_docker_database(){
-	# Container variables for launch
-	set_env_var POSTGRES_PASSWORD "$dbpasswd"
-	set_env_var POSTGRES_USER "dbadmin"
-	set_env_var POSTGRES_DB "dbmain"
-	# Environment variables
-	set_env_var DB_ENGINE postgres
-	set_env_var DB_HOST postgres.service.consul
-	set_env_var DB_PORT 5432
-	set_env_var DB_PASSWORD "$dbpasswd"
-	set_env_var DB_USERNAME "dbadmin"
-	set_env_var DB_NAME "dbmain"
-	set_env_var PROJECT_DB_PASSWORD "$dbpasswd"
-	set_env_var PROJECT_DB_USERNAME "dbadmin"
-	set_env_var PROJECT_DB_NAME "dbmain"
-	# All variables are defined before container launch to avoid
-	# un-necessary re-scheduling due to environment changes
-	add_service "${POSTGRES_DOCKER_IMAGE:-postgres:10}"
-}
-
 # Function creating the project
 # this is the main entry point
 function create_project(){
@@ -243,7 +207,7 @@ function create_project(){
 		echo "${PROJECT_NAME} already created. Skipping..."
 		if echo "$projects" | grep -Eq "${search_pattern}no_infra\s\s*"; then
 			echo "${PROJECT_NAME} starting provisionning..."
-			${SQSC_BIN} project provision "${ORG_OPTIONS}" -project-name "${FULL_PROJECT_NAME}"
+			${SQSC_BIN} project provision -project-name "${FULL_PROJECT_NAME}"
 		elif echo "$projects" | grep -Eq "${search_pattern}error\s\s*"; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
 			exit 1
@@ -261,31 +225,11 @@ function create_project(){
 			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
 			exit 1
 		fi
-		if [ -z "${DOCKER_DB}" ]; then
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
-		else
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
-		fi
+		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -root-disk-size \"${INFRA_NODE_DISK_SIZE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "${search_pattern}" | awk '{print $2}')
 
-	# All variables are defined before container launch to avoid
-	# un-necessary re-scheduling due to environment changes
-	set_env_vars
-	if [ -n "${DOCKER_DB}" ]; then
-		# sqsc env get returns error if variable is not set already
-		# and -e has been activated globally at the top of this script
-		set +e
-		dbpasswd=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" POSTGRES_PASSWORD 2>/dev/null)
-		# shellcheck disable=SC2181
-		if [ $? -ne 0 ] && [ -z "$dbpasswd" ]; then
-			dbpasswd=$(pwgen 32 1)
-		fi
-		# Restore script failure on further errors
-		set -e
-		add_docker_database
-	fi
 	# To send notifications on #demoapp SquareScale Slack channel
 	if [ -n "${SLACK_WEB_HOOK}" ]; then
 		slackwebhook="$(${SQSC_BIN} project slackbot -project-uuid "${PROJECT_UUID}")"
@@ -302,16 +246,6 @@ function create_project(){
 	else
 		echo "SLACK_WEB_HOOK not set: ignoring ..."
 	fi
-}
-
-function set_env_vars(){
-	# No need to check here as this will overwrite current values if any (therefore unchanged if same)
-	set_env_var NODE_ENV production
-	set_env_var RABBITMQ_HOST rabbitmq.service.consul
-}
-
-function display_env_vars(){
-	${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}"
 }
 
 function show_containers(){
@@ -344,32 +278,51 @@ function wait_containers(){
 }
 
 function add_services(){
-	add_service "${WORKER_DOCKER_IMAGE:-squarescale/sqsc-demo-worker}"
-	add_service "${APP_DOCKER_IMAGE:-squarescale/sqsc-demo-app}"
-	add_service "${RABBITMQ_DOCKER_IMAGE:-rabbitmq}" "${RABBITMQ_RAM_SIZE}"
+	add_service "${ELASTICSEARCH_DOCKER_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch}:${DEFAULT_VERSION}" "${RAM_SIZE}" "${CPU_SIZE}"
+	add_service "${KIBANA_DOCKER_IMAGE:-docker.elastic.co/kibana/kibana}:${DEFAULT_VERSION}" "${RAM_SIZE}" "${CPU_SIZE}"
 }
 
-function set_network_rule(){
-	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name sqsc-demo-app)
-	if echo "$net_rule" | grep -Eq '^sqsc-demo-app\s*http/3000\s*http/80\s*'; then
-		echo "Network rule already configured. Skipping..."
+function configure_services_environment(){
+	# TODO: cleanup tmp files on error
+	# TODO: check existing config before overriding and rescheduling
+	echo -e '{\n"node.name": "es01",\n"cluster.name": "es-docker-cluster",\n"bootstrap.memory_lock": "false",\n"discovery.type": "single-node"}\n' | jq -rS . >/tmp/es-svc.json
+	${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service elasticsearch -instances 1 -env /tmp/es-svc.json
+	rm -f /tmp/es-svc.json
+	echo -e '{\n"ELASTICSEARCH_HOSTS": "http://elasticsearch.service.consul:9200",\n"SERVER_BASEPATH": "/kibana",\n"SERVER_REWRITEBASEPATH": "true"}\n' | jq -rS . >/tmp/ki-svc.json
+	${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service kibana -instances 1 -env /tmp/ki-svc.json
+	rm -f /tmp/ki-svc.json
+}
+
+function set_network_rules(){
+	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name elasticsearch)
+	if echo "$net_rule" | grep -Eq '^es\s*http/9200\s*http/80\s*/$'; then
+		echo "Network rule already configured for elasticsearch. Skipping..."
 	else
 		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
-		echo "Adding network rule"
-		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "sqsc-demo-app" -internal-protocol "http" -internal-port 3000 -external-protocol "http" -service-name "sqsc-demo-app"
+		echo "Adding network rule for elasticsearch"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "es" -internal-protocol "http" -internal-port 9200 -external-protocol "http" -service-name "elasticsearch" -path "/"
+	fi
+	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name kibana)
+	if echo "$net_rule" | grep -Eq '^ki\s*http/5601\s*http/80\s*/kibana$'; then
+		echo "Network rule already configured for kibana. Skipping..."
+	else
+		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
+		echo "Adding network rule for kibana"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "ki" -internal-protocol "http" -internal-port 5601 -external-protocol "http" -service-name "kibana" -path "/kibana"
 	fi
 }
 
 function show_url(){
-	echo -e 'Front load balancer informations\n'
-	${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}"
+	echo -e 'Load balancer informations\n'
+	lb_url=$(${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}" | grep '://' | awk '{print $NF}')
+	echo -e "ElasticSearch URL:\t${lb_url}\nKibana URL:\t\t${lb_url}/kibana\n"
 }
 
 create_project
 add_services
-set_network_rule
+configure_services_environment
+set_network_rules
 
 # Show all
-display_env_vars
 wait_containers
 show_url
