@@ -337,7 +337,7 @@ function wait_containers(){
 			echo "${c} not ready"
 			sleep 5
 		else
-			echo -e 'All containers ready\n'
+			echo -e "All containers ready\n"
 			break
 		fi
 	done
@@ -361,7 +361,7 @@ function set_network_rule(){
 }
 
 function show_url(){
-	echo -e 'Front load balancer informations\n'
+	echo -e "Front load balancer informations\n"
 	${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}"
 }
 
