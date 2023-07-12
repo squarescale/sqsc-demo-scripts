@@ -155,7 +155,7 @@ function wait_for_project_scheduling() {
 			exit 1
 		fi
 		# shellcheck disable=SC2207,SC2001
-		available=($(echo "${Nodes}" | sed -e 's?/? ?'))
+		available=($(echo "${Cluster}" | sed -e 's?/? ?'))
 		if [ "${Status}" != "ok" ] || [ "${available[0]}" == "0" ] || [ -z "${available[0]}" ]; then
 			echo "Project ${PROJECT_NAME} is not ready to schedule any containers yet"
 			sleep 5
