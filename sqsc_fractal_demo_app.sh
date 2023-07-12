@@ -148,7 +148,7 @@ function wait_for_project_scheduling() {
 	fi
 	while true; do
 		# shellcheck disable=SC2207
-		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack|^Age' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
+		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack Webhook|^Age|External ElasticSearch' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
 		# shellcheck disable=SC2154
 		if [ "${Status}" == "error" ]; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
