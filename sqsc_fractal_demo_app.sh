@@ -43,7 +43,7 @@
 # CLOUD_CREDENTIALS: default to ""
 #
 # Support for multiple databases version has also been added
-# DEFAULT_PG_VERSION: default to 10
+# DEFAULT_PG_VERSION: default to 12
 #
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
@@ -73,7 +73,7 @@ INFRA_TYPE=${INFRA_TYPE:-"high-availability"}
 RABBITMQ_RAM_SIZE=${RABBITMQ_RAM_SIZE:-"4096"}
 
 # Default Postgres RDS version
-DEFAULT_PG_VERSION=${DEFAULT_PG_VERSION:-"10"}
+DEFAULT_PG_VERSION=${DEFAULT_PG_VERSION:-"12"}
 
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
@@ -229,7 +229,7 @@ function add_docker_database(){
 	set_env_var PROJECT_DB_NAME "dbmain"
 	# All variables are defined before container launch to avoid
 	# un-necessary re-scheduling due to environment changes
-	add_service "${POSTGRES_DOCKER_IMAGE:-postgres:10}"
+	add_service "${POSTGRES_DOCKER_IMAGE:-postgres:${DEFAULT_PG_VERSION}}"
 }
 
 # Function creating the project
