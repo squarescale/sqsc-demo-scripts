@@ -179,10 +179,10 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image"
-		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$1"
+		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$1" -instances 1
 	fi
 	if [ -n "$2" ]; then
-		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -name "$container_image" | grep ^Mem | awk '{print $(NF-1)}')
+		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -service "$container_image" | grep ^Mem | awk '{print $(NF-1)}')
 		if [ "$cur_val" != "$2" ]; then
 			echo "Increasing $1 container memory to $2"
 			${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$container_image" -memory "$2"

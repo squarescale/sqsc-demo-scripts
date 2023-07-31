@@ -189,7 +189,7 @@ function add_service() {
 		echo "${PROJECT_NAME} already configured with service $1 container $container_image. Skipping..."
 	else
 		echo "Adding container service $container_image as job ${1}"
-		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$2" -service "$1"
+		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$2" -service "$1" -instances 1
 	fi
 	set_svc_env_var "$1" NAME "$1"
 	set_svc_env_var "$1" MESSAGE "Hello from $1"
