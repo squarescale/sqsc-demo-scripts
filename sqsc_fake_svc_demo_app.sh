@@ -172,7 +172,7 @@ function wait_for_project_scheduling() {
 #
 function set_svc_env_var(){
 	evs=$(${SQSC_BIN} env get -project-uuid "${PROJECT_UUID}" -service "$1" 2>/dev/null | awk 'NF>0{print}' | sed -e 's/=/="/' -e 's/$/"/')
-	eval $(echo "$evs")
+	eval "$evs"
 	ev=$2
 	v=${!ev}
 	if [ "$v" == "$3" ]; then
@@ -181,7 +181,7 @@ function set_svc_env_var(){
 		${SQSC_BIN} env set -project-uuid "${PROJECT_UUID}" -service "$1" "$2" "$3"
 	fi
 	# reset all vars previously defined
-	eval $(echo "$evs" | awk -F= '{printf "unset %s\n",$1}')
+	eval "$(echo "$evs" | awk -F= '{printf "unset %s\n",$1}')"
 }
 
 # Function which creates a service
@@ -324,7 +324,7 @@ function set_network_rule(){
 	else
 		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
 		echo "Adding network rule"
-		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "web" -internal-protocol "http" -internal-port ${FAKESERVICE_UI_PORT} -external-protocol "http" -service-name "web"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "web" -internal-protocol "http" -internal-port "${FAKESERVICE_UI_PORT}" -external-protocol "http" -service-name "web"
 	fi
 }
 
