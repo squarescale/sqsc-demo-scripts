@@ -35,6 +35,7 @@
 #
 # Select multi node or single node deployment
 # INFRA_TYPE can be high-availabilityor single-node (default)
+# INFRA_NODES_COUNT can be over 3 for high-availability (default 3) or 1 for single-node
 
 SCRIPT_VERSION="1.1-2023-08-17"
 
@@ -52,6 +53,13 @@ set -e
 INFRA_NODE_SIZE=${VM_SIZE:-"large"}
 INFRA_NODE_DISK_SIZE=${DISK_SIZE:-"60"}
 INFRA_TYPE=${INFRA_TYPE:-"single-node"}
+INFRA_NODES_COUNT=${INFRA_NODES_COUNT:-""}
+INFRA_OPTIONS=""
+if [ -z "${INFRA_NODES_COUNT}" ]; then
+	if [ "${INFRA_TYPE}" != "high-availability" ]; then
+		INFRA_OPTIONS="-node-count 1"
+	fi
+fi
 
 # Set memory used by containers
 #
@@ -225,7 +233,7 @@ function create_project(){
 			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
 			exit 1
 		fi
-		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -root-disk-size \"${INFRA_NODE_DISK_SIZE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
+		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -root-disk-size \"${INFRA_NODE_DISK_SIZE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "${search_pattern}" | awk '{print $2}')

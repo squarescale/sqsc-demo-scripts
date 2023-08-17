@@ -50,6 +50,7 @@
 #
 # Select multi node or single node deployment
 # INFRA_TYPE can be high-availability (default) or single-node
+# INFRA_NODES_COUNT can be over 3 for high-availability (default 3) or 1 for single-node
 
 SCRIPT_VERSION="3.2-2023-07-17"
 
@@ -66,6 +67,14 @@ set -e
 #
 INFRA_NODE_SIZE=${VM_SIZE:-"medium"}
 INFRA_TYPE=${INFRA_TYPE:-"high-availability"}
+INFRA_NODES_COUNT=${INFRA_NODES_COUNT:-""}
+
+INFRA_OPTIONS=""
+if [ -z "${INFRA_NODES_COUNT}" ]; then
+	if [ "${INFRA_TYPE}" != "high-availability" ]; then
+		INFRA_OPTIONS="-node-count 1"
+	fi
+fi
 
 # Set memory used by RabbitMQ container
 # Default is 4096 because of RabbitMQ requirements
@@ -262,9 +271,9 @@ function create_project(){
 			exit 1
 		fi
 		if [ -z "${DOCKER_DB}" ]; then
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		else
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		fi
 		projects=$(${SQSC_BIN} project list)
 	fi

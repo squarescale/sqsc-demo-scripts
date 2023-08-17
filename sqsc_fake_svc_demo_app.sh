@@ -26,6 +26,7 @@
 # VM_SIZE: (small, medium, large, dev, xsmall) Default is empty aka small
 #
 # INFRA_TYPE: (high-availability, single-node) Default is empty aka single-node
+# INFRA_NODES_COUNT can be over 3 for high-availability (default 3) or 1 for single-node
 #
 # Since version 1.4 of this script, multi-cloud providers support has been added
 # and therefore the following environment variables have been added
@@ -62,6 +63,14 @@ INFRA_NODE_SIZE=${VM_SIZE:-"small"}
 # Set infrastructure type to single-node (can also be high-availability)
 #
 INFRA_TYPE=${INFRA_TYPE:-"single-node"}
+INFRA_NODES_COUNT=${INFRA_NODES_COUNT:-""}
+
+INFRA_OPTIONS=""
+if [ -z "${INFRA_NODES_COUNT}" ]; then
+	if [ "${INFRA_TYPE}" != "high-availability" ]; then
+		INFRA_OPTIONS="-node-count 1"
+	fi
+fi
 
 # Set project name according to 1st argument on command line or default
 # Convert to lower-case to avoid later errors
@@ -227,7 +236,7 @@ function create_project(){
 			echo "You need to set CLOUD_CREDENTIALS to an existing IaaS credential in your account profile"
 			exit 1
 		fi
-		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
+		eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		projects=$(${SQSC_BIN} project list)
 	fi
 	PROJECT_UUID=$(echo "$projects" | grep -E "^${PROJECT_NAME}\s\s*" | awk '{print $2}')
