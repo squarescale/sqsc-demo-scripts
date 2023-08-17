@@ -36,7 +36,7 @@
 # Select multi node or single node deployment
 # INFRA_TYPE can be high-availabilityor single-node (default)
 
-SCRIPT_VERSION="1.0-2023-05-05"
+SCRIPT_VERSION="1.1-2023-08-17"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}

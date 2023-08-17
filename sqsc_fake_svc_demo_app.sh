@@ -37,7 +37,7 @@
 # Monitoring via netdata can be activated on project deployment
 # MONITORING=netdata # default to ""
 #
-SCRIPT_VERSION="1.2-2023-05-06"
+SCRIPT_VERSION="1.3-2023-08-17"
 
 # Originally nicholasjackson/fake-service:v0.22.9
 FAKESERVICE_DOCKER_IMAGE="${FAKESERVICE_DOCKER_IMAGE:-obourdon/fake-service:0.23.2-test}"
