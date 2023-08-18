@@ -271,9 +271,9 @@ function create_project(){
 			exit 1
 		fi
 		if [ -z "${DOCKER_DB}" ]; then
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${EXTRA_OPTIONS} ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -db-engine postgres -db-size small -db-version \"${DEFAULT_PG_VERSION}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		else
-			eval "${SQSC_BIN} project create ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
+			eval "${SQSC_BIN} project create ${EXTRA_OPTIONS} ${ORG_OPTIONS} ${SLACK_OPTIONS} ${NO_CONFIRM} ${MONITORING_OPTIONS} -provider \"${CLOUD_PROVIDER}\" -region \"${CLOUD_REGION}\" -credential \"${CLOUD_CREDENTIALS}\" -infra-type \"${INFRA_TYPE}\" ${INFRA_OPTIONS} -node-size \"${INFRA_NODE_SIZE}\" -project-name \"${PROJECT_NAME}\""
 		fi
 		projects=$(${SQSC_BIN} project list)
 	fi
