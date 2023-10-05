@@ -34,10 +34,10 @@
 # DEFAULT_VERSION: default to 7.10.2
 #
 # Select multi node or single node deployment
-# INFRA_TYPE can be high-availabilityor single-node (default)
+# INFRA_TYPE can be high-availability or single-node (default)
 # INFRA_NODES_COUNT can be over 3 for high-availability (default 3) or 1 for single-node
 
-SCRIPT_VERSION="1.1-2023-08-17"
+SCRIPT_VERSION="1.2-2023-10-05"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -48,7 +48,7 @@ echo -e "\nRunning $(basename "${BASH_SOURCE[0]}") version ${SCRIPT_VERSION}\n"
 set -e
 
 # Set infra instances size (small, medium, large, dev, xsmall).
-# Default is medium because of RabbitMQ requirements
+# Default is large because of ElasticSearch requirements
 #
 INFRA_NODE_SIZE=${VM_SIZE:-"large"}
 INFRA_NODE_DISK_SIZE=${DISK_SIZE:-"60"}
@@ -66,7 +66,7 @@ fi
 RAM_SIZE=${RAM_SIZE:-"4096"}
 CPU_SIZE=${CPU_SIZE:-"1000"}
 
-# Default Postgres RDS version
+# Default ElasticSearch version
 DEFAULT_VERSION=${DEFAULT_VERSION:-"7.10.2"}
 
 # Set project name according to 1st argument on command line or default
