@@ -354,7 +354,8 @@ create_project
 wait_for_project_scheduling
 add_scheduling_groups
 echo -e 'Adding external nodes\n'
-for n in ${EXTERNAL_NODES[@]}; do add_external_node $(echo $n | sed -e 's/:/ /'); done
+# shellcheck disable=SC2068,SC2086
+for n in ${EXTERNAL_NODES[@]}; do add_external_node ${n//:/ }; done
 add_services
 set_network_rules
 
