@@ -167,7 +167,7 @@ function add_external_node() {
 		fi
 	else
 		echo "Creating external node $1 with IP $2 in ${PROJECT_NAME}..."
-		${SQSC_BIN} external-node add -project-uuid "${PROJECT_UUID}" -public-ip "$2" "$1"
+		${SQSC_BIN} external-node add -nowait -project-uuid "${PROJECT_UUID}" -public-ip "$2" "$1"
 	fi
 }
 
