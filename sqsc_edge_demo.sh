@@ -86,7 +86,7 @@ fi
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.1.5"
+REQUIRED_SQSC_VERSION="1.1.6"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
@@ -131,7 +131,7 @@ function wait_for_project_scheduling() {
 	fi
 	while true; do
 		# shellcheck disable=SC2207
-		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack|^Age|^External' | awk 'NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
+		eval "$(${SQSC_BIN} project get -project-name "${FULL_PROJECT_NAME}" | grep -Ev '^Slack|^Age|^External' | awk '/Network policies/{exit}NF>1{print}' | sed -e 's/: /="/' -e 's/$/"/')"
 		# shellcheck disable=SC2154
 		if [ "${Status}" == "error" ]; then
 			echo "${PROJECT_NAME} provisionning has encountered an error"
@@ -350,12 +350,41 @@ function add_scheduling_groups() {
 	for s in "cloud" "vpn" "edge"; do add_scheduling_group "$s"; done
 }
 
+function assign_scheduling_groups() {
+	echo -e 'Populating scheduling groups\n'
+	cur_sched_groups=$(${SQSC_BIN} project details -project-name Edge-demo/sqsc-edge-demo -no-summary -no-external-nodes -no-compute-resources | awk 'BEGIN{n=0}/Scheduling groups/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
+	cur_compute_resources=$(${SQSC_BIN} project details -project-name Edge-demo/sqsc-edge-demo -no-summary -no-external-nodes -no-scheduling-groups | awk 'BEGIN{n=0}/Compute resources/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
+	cur_edge_nodes=$(${SQSC_BIN} project details -project-name Edge-demo/sqsc-edge-demo -no-summary -no-compute-resources -no-scheduling-groups | awk 'BEGIN{n=0}/External nodes/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
+	for n in $(echo "${cur_compute_resources}" | grep -v t3a.micro | awk '{print $1}'); do
+		if echo "${cur_sched_groups}" | grep -Eq "^cloud\s\s*.*$n"; then
+			echo "$n already configured in cloud scheduling group"
+		else
+			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" cloud $n
+		fi
+	done
+	for n in $(echo "${cur_compute_resources}" | grep t3a.micro | awk '{print $1}'); do
+		if echo "${cur_sched_groups}" | grep -Eq "^vpn\s\s*.*$n"; then
+			echo "$n already configured in vpn scheduling group"
+		else
+			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" vpn $n
+		fi
+	done
+	for n in $(echo "${cur_edge_nodes}" | awk '{print $1}'); do
+		if echo "${cur_sched_groups}" | grep -Eq "^edge\s\s*.*$n"; then
+			echo "$n already configured in edge scheduling group"
+		else
+			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" edge $n
+		fi
+	done
+}
+
 create_project
 wait_for_project_scheduling
 add_scheduling_groups
 echo -e 'Adding external nodes\n'
 # shellcheck disable=SC2068,SC2086
 for n in ${EXTERNAL_NODES[@]}; do add_external_node ${n//:/ }; done
+assign_scheduling_groups
 add_services
 set_network_rules
 
