@@ -352,9 +352,9 @@ function add_scheduling_groups() {
 
 function assign_scheduling_groups() {
 	echo -e 'Populating scheduling groups\n'
-	cur_sched_groups=$(${SQSC_BIN} project details -project-name Edge-demo/sqsc-edge-demo -no-summary -no-external-nodes -no-compute-resources | awk 'BEGIN{n=0}/Scheduling groups/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
-	cur_compute_resources=$(${SQSC_BIN} project details -project-name Edge-demo/sqsc-edge-demo -no-summary -no-external-nodes -no-scheduling-groups | awk 'BEGIN{n=0}/Compute resources/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
-	cur_edge_nodes=$(${SQSC_BIN} project details -project-name Edge-demo/sqsc-edge-demo -no-summary -no-compute-resources -no-scheduling-groups | awk 'BEGIN{n=0}/External nodes/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
+	cur_sched_groups=$(${SQSC_BIN} project details -project-uuid "${PROJECT_UUID}" -no-summary -no-external-nodes -no-compute-resources | awk 'BEGIN{n=0}/Scheduling groups/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
+	cur_compute_resources=$(${SQSC_BIN} project details -project-uuid "${PROJECT_UUID}" -no-summary -no-external-nodes -no-scheduling-groups | awk 'BEGIN{n=0}/Compute resources/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
+	cur_edge_nodes=$(${SQSC_BIN} project details -project-uuid "${PROJECT_UUID}" -no-summary -no-compute-resources -no-scheduling-groups | awk 'BEGIN{n=0}/External nodes/{n=1;next}n==1&&!/NAME/&&length($0)>0{print}')
 	for n in $(echo "${cur_compute_resources}" | grep -v t3a.micro | awk '{print $1}'); do
 		if echo "${cur_sched_groups}" | grep -Eq "^cloud\s\s*.*$n"; then
 			echo "$n already configured in cloud scheduling group"
