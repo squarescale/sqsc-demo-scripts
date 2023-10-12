@@ -34,7 +34,7 @@
 # INFRA_TYPE can be high-availability or single-node (default)
 # INFRA_NODES_COUNT can be over 3 for high-availability (default 3) or 1 for single-node
 
-SCRIPT_VERSION="1.0-2023-10-05"
+SCRIPT_VERSION="1.1-2023-10-11"
 
 # Do not ask interactive user confirmation when creating resources
 NO_CONFIRM=${NO_CONFIRM:-"-yes"}
@@ -86,7 +86,7 @@ fi
 # Look up for sqsc CLI binary in PATH
 SQSC_BIN=$(command -v sqsc)
 SQSC_VERSION=$(${SQSC_BIN} version | awk '{print $3}')
-REQUIRED_SQSC_VERSION="1.1.6"
+REQUIRED_SQSC_VERSION="1.1.7"
 if [ "${SQSC_VERSION}" != "${REQUIRED_SQSC_VERSION}" ]; then
 	echo "sqsc CLI version ${REQUIRED_SQSC_VERSION} required (${SQSC_VERSION} detected)"
 	exit 1
@@ -191,8 +191,9 @@ function add_scheduling_group() {
 #
 # Parameters:
 # 1) Docker Hub container image name
-# 2) Memory size required (optional)
-# 3) CPU size required (optional)
+# 2) Scheduling group(s) (optional)
+# 3) Memory size required (optional)
+# 4) CPU size required (optional)
 #
 function add_service() {
 	wait_for_project_scheduling
@@ -201,10 +202,14 @@ function add_service() {
 	if echo "$cur_containers" | grep -Eq "^${container_image}\s\s*"; then
 		echo "${PROJECT_NAME} already configured with service container $container_image. Skipping..."
 	else
+		SCHED_GROUPS_OPTS=""
+		if [ -n "$2" ]; then
+			SCHED_GROUPS_OPTS="-scheduling-groups $2"
+		fi
 		echo "Adding container service $container_image"
-		${SQSC_BIN} service add -project-uuid "${PROJECT_UUID}" -docker-image "$1" -instances 1
+		eval "${SQSC_BIN}" service add -project-uuid "${PROJECT_UUID}" -docker-image "$1" -instances 1 "${SCHED_GROUPS_OPTS}"
 	fi
-	if [ -n "$2" ]; then
+	if [ -n "$3" ]; then
 		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -service "$container_image" | grep ^Mem | awk '{print $(NF-1)}')
 		if [ "$cur_val" != "$2" ]; then
 			echo "Increasing $1 container memory to $2"
@@ -213,7 +218,7 @@ function add_service() {
 			echo "$1 container memory already set to $2"
 		fi
 	fi
-	if [ -n "$3" ]; then
+	if [ -n "$4" ]; then
 		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -service "$container_image" | grep ^CPU | awk '{print $(NF-1)}')
 		if [ "$cur_val" != "$3" ]; then
 			echo "Increasing $1 container CPU to $3"
@@ -332,17 +337,24 @@ function wait_containers(){
 }
 
 function add_services(){
-	:
+	add_service "${IREFLEX_DEMO_DOCKER_IMAGE:-squarescale/demo-ireflex-js}" edge
 }
 
 function set_network_rules(){
-	:
+	echo -e 'Adding network rules\n'
+	net_rule=$(${SQSC_BIN} network-rule list -project-uuid "${PROJECT_UUID}" -service-name demo-ireflex-js)
+	if echo "$net_rule" | grep -Eq '^demo-ireflex-js\s*http/80\s*http/80\s*'; then
+		echo "Network rule already configured. Skipping..."
+	else
+		# TODO: see if this needs to be parametrized (duplicate/resource already exist)
+		echo "Adding network rule"
+		${SQSC_BIN} network-rule create -project-uuid "${PROJECT_UUID}" -name "demo-ireflex-js" -internal-protocol "http" -internal-port 80 -external-protocol "http" -service-name "demo-ireflex-js" -path "/"
+	fi
 }
 
 function show_url(){
-	echo -e 'Load balancer informations\n'
 	lb_url=$(${SQSC_BIN} lb list -project-uuid "${PROJECT_UUID}" | grep '://' | awk '{print $NF}')
-	echo -e "ElasticSearch URL:\t${lb_url}\nKibana URL:\t\t${lb_url}/kibana\n"
+	echo -e "Load Balancer and service URL:\t${lb_url}/\n"
 }
 
 function add_scheduling_groups() {
@@ -360,7 +372,7 @@ function assign_scheduling_groups() {
 			echo "$n already configured in cloud scheduling group"
 		else
 			echo "Assigning $n to cloud scheduling group"
-			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" cloud $n
+			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" cloud "$n"
 		fi
 	done
 	for n in $(echo "${cur_compute_resources}" | grep -E '\s\s*Cluster\s\s*' | grep t3a.micro | awk '{print $1}'); do
@@ -368,7 +380,7 @@ function assign_scheduling_groups() {
 			echo "$n already configured in vpn scheduling group"
 		else
 			echo "Assigning $n to vpn scheduling group"
-			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" vpn $n
+			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" vpn "$n"
 		fi
 	done
 	for n in $(echo "${cur_edge_nodes}" | awk '{print $1}'); do
@@ -376,7 +388,7 @@ function assign_scheduling_groups() {
 			echo "$n already configured in edge scheduling group"
 		else
 			echo "Assigning $n to edge scheduling group"
-			${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" edge $n
+			#${SQSC_BIN} scheduling-group assign -project-uuid "${PROJECT_UUID}" edge "$n"
 		fi
 	done
 }
