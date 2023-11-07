@@ -169,7 +169,7 @@ function add_service() {
 	if [ -n "$2" ]; then
 		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -service "$container_image" | grep ^Mem | awk '{print $(NF-1)}')
 		if [ "$cur_val" != "$2" ]; then
-			echo "Increasing $1 container memory to $2"
+			echo "Updating $1 container memory to $2 (was $cur_val)"
 			${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$container_image" -memory "$2"
 		else
 			echo "$1 container memory already set to $2"
@@ -178,7 +178,7 @@ function add_service() {
 	if [ -n "$3" ]; then
 		cur_val=$(${SQSC_BIN} service show -project-uuid "${PROJECT_UUID}" -service "$container_image" | grep ^CPU | awk '{print $(NF-1)}')
 		if [ "$cur_val" != "$3" ]; then
-			echo "Increasing $1 container CPU to $3"
+			echo "Updating $1 container CPU to $3 (was $cur_val)"
 			${SQSC_BIN} service set -project-uuid "${PROJECT_UUID}" -service "$container_image" -cpu "$3"
 		else
 			echo "$1 container CPU already set to $3"
